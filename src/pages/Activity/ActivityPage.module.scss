@@ -1,0 +1,1039 @@
+* {
+  box-sizing: border-box;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100vw;
+  min-height: 100vh;
+  background: #f9fafb;
+  color: #0a0a0a;
+}
+
+.layout {
+  display: flex;
+  width: 100%;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  background: #0e1d45;
+  min-height: 100vh;
+  width: 256px;
+  color: #fff;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  column-gap: 12px;
+  border-bottom: 1px solid #ffffff1a;
+  padding: 24px;
+  width: 256px;
+}
+.brandTitle {
+  color: #ffffff;
+  font-family: Inter, Arial, Helvetica, sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+}
+.brandSub {
+  color: #bedbff;
+  font-size: 12px;
+  line-height: 16px;
+}
+.nav {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 16px;
+  row-gap: 8px;
+  flex-grow: 1;
+  width: 100%;
+}
+.navItem {
+  display: flex;
+  align-items: center;
+  column-gap: 12px;
+  border-radius: 10px;
+  padding-left: 16px;
+  height: 48px;
+  width: 100%;
+  color: #dbeafe;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.navItemActive {
+  background: #3a76f0;
+  color: #fff;
+}
+.navIcon {
+  width: 20px;
+  height: 20px;
+}
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-top: 1px solid #ffffff1a;
+  padding: 16px;
+  width: 100%;
+}
+.profileAvatar {
+  display: flex;
+  align-items: center;
+  border-radius: 9999px;
+  background: #3a76f0;
+  width: 40px;
+  height: 40px;
+  color: #fff;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  width: 100%;
+}
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+  padding: 16px 32px;
+  width: 100%;
+}
+.titleWrap {
+  display: flex;
+  flex-direction: column;
+  row-gap: 4px;
+}
+.title {
+  color: #0e1d45;
+  font-family: Inter, Arial, Helvetica, sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 36px;
+}
+.subtitle {
+  color: #6a7282;
+  font-size: 14px;
+  line-height: 20px;
+}
+.topActions {
+  display: flex;
+  align-items: center;
+  column-gap: 12px;
+}
+.notif {
+  position: relative;
+  border-radius: 7px;
+  width: 36px;
+  height: 36px;
+  background: #f5f5f5;
+}
+.notifBadge {
+  display: flex;
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: #fb2c36;
+  width: 20px;
+  height: 20px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px 32px;
+  width: 100%;
+}
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 16px;
+}
+.kpiCard {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 10px 15px -3px #0000001a, 0 4px 6px -4px #0000001a;
+  padding: 16px;
+  gap: 6px;
+}
+.kpiTitle {
+  color: #6a7282;
+  font-size: 14px;
+}
+.kpiValue {
+  color: #0a0a0a;
+  font-size: 24px;
+  font-weight: 700;
+}
+.kpiSub {
+  color: #22c55e;
+  font-size: 12px;
+}
+
+.chartsRow {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 16px;
+  width: 100%;
+}
+.chartsCol {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e5e5e5;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 10px 15px -3px #0000001a, 0 4px 6px -4px #0000001a;
+  padding: 16px;
+  gap: 12px;
+  width: 100%;
+}
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cardTitle {
+  color: #0a0a0a;
+  font-size: 18px;
+  font-weight: 600;
+}
+.cardSubtitle {
+  color: #6a7282;
+  font-size: 14px;
+}
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.select,
+.input {
+  border: 1px solid #e5e5e5;
+  border-radius: 7px;
+  background: #f5f5f5;
+  height: 36px;
+  padding: 6px 10px;
+  color: #0a0a0a;
+}
+.chartPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  height: 260px;
+  color: #737373;
+  background: #ffffff;
+}
+.chartWide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  height: 320px;
+  background: #ffffff;
+}
+.legendRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding-top: 8px;
+  color: #3a76f0;
+}
+.legendItemInline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.donutWrap {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: 16px;
+}
+.legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #364153;
+  font-size: 14px;
+}
+.legendDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.listItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  padding: 10px 12px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.listItem:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px #0000001a, 0 4px 6px -4px #0000001a;
+}
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f5f5;
+  color: #0a0a0a;
+  border-radius: 9999px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  padding: 8px 12px;
+  height: 36px;
+  background: #e5e5e5;
+}
+.btnPrimary {
+  background: #3a76f0;
+  color: #fff;
+}
+
+.avatarSmall {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: #3a76f0;
+  width: 32px;
+  height: 32px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.teacherKpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+
+.teacherKpiCard {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e5e5e5;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 10px 15px -3px #0000001a, 0 4px 6px -4px #0000001a;
+  padding: 16px;
+  gap: 10px;
+  min-height: 120px;
+}
+
+.teacherKpiTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.teacherKpiIconWrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.teacherKpiIconBlue {
+  background: #dbeafe;
+}
+
+.teacherKpiIconPurple {
+  background: #f3e8ff;
+}
+
+.teacherKpiIconGreen {
+  background: #dcfce7;
+}
+
+.teacherKpiIconOrange {
+  background: #ffedd5;
+}
+
+.teacherKpiIcon {
+  width: 18px;
+  height: 18px;
+}
+
+.teacherKpiDelta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  padding: 2px 8px;
+  background: #f5f5f5;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0a0a0a;
+}
+
+.teacherKpiValue {
+  font-size: 28px;
+  font-weight: 800;
+  color: #0a0a0a;
+}
+
+.teacherKpiLabel {
+  font-size: 13px;
+  color: #6a7282;
+  font-weight: 600;
+}
+
+.teacherCardHeaderCol {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.teacherChartSmall {
+  height: 260px;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.teacherLegendRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: #364153;
+  font-size: 14px;
+}
+
+.teacherLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.teacherLegendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+}
+
+.teacherListHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.teacherLinkBtn {
+  border: none;
+  background: transparent;
+  color: #3a76f0;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
+.teacherLinkBtn:hover {
+  background: #eff6ff;
+}
+
+.teacherActivityList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.teacherActivityItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  padding: 12px;
+  gap: 12px;
+}
+
+.teacherActivityLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.teacherActivityAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  background: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: #0e1d45;
+}
+
+.teacherActivityText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.teacherActivityName {
+  font-weight: 800;
+  color: #0a0a0a;
+}
+
+.teacherActivitySub {
+  color: #6a7282;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.teacherActivityProject {
+  color: #0e1d45;
+  font-weight: 700;
+}
+
+.teacherActivityTime {
+  color: #6a7282;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.teacherActivityDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  display: inline-block;
+}
+
+.teacherDotBlue {
+  background: #3a76f0;
+}
+
+.teacherDotPurple {
+  background: #a855f7;
+}
+
+.teacherDotGreen {
+  background: #22c55e;
+}
+
+.teacherDotOrange {
+  background: #f59e0b;
+}
+
+.teacherStudentsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.teacherStudentRow {
+  border: 1px solid #e5e5e5;
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.teacherStudentTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.teacherStudentAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  background: #dbeafe;
+  color: #0e1d45;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.teacherStudentMain {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.teacherStudentName {
+  font-weight: 800;
+  color: #0a0a0a;
+}
+
+.teacherStudentProject {
+  color: #6a7282;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teacherStudentMetaRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.teacherStudentTasks {
+  color: #364153;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.teacherStudentPct {
+  color: #6a7282;
+  font-size: 12px;
+}
+
+.teacherProgressBar {
+  width: 100%;
+  height: 8px;
+  border-radius: 9999px;
+  background: #f5f5f5;
+  overflow: hidden;
+}
+
+.teacherProgressFill {
+  height: 100%;
+  background: #3a76f0;
+  border-radius: 9999px;
+}
+
+.teacherStudentLast {
+  color: #6a7282;
+  font-size: 12px;
+}
+
+.teacherProjectsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.teacherProjectCard {
+  border: 1px solid #e5e5e5;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.teacherProjectTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.teacherProjectTitle {
+  font-weight: 800;
+  color: #0a0a0a;
+}
+
+.teacherProjectPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.teacherPillUrgent {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.teacherPillAttention {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.teacherPillLow {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.teacherProjectMembers {
+  color: #6a7282;
+  font-size: 13px;
+}
+
+.teacherProjectIssue {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.teacherIssueRed {
+  color: #ef4444;
+}
+
+.teacherIssueBlue {
+  color: #3a76f0;
+}
+
+.teacherIssueGray {
+  color: #6a7282;
+}
+
+.teacherProjectBtn {
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  height: 36px;
+  background: #ffffff;
+  font-weight: 800;
+  color: #0e1d45;
+  cursor: pointer;
+}
+
+.teacherProjectBtn:hover {
+  background: #f9fafb;
+}
+
+.headKpiGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+
+.headKpiCard {
+  border: 1px solid #e5e5e5;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 10px 15px -3px #0000001a, 0 4px 6px -4px #0000001a;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 130px;
+}
+
+.headKpiTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.headKpiIconWrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.headKpiIconBlue {
+  background: #dbeafe;
+}
+
+.headKpiIconGreen {
+  background: #dcfce7;
+}
+
+.headKpiIconPurple {
+  background: #f3e8ff;
+}
+
+.headKpiIcon {
+  width: 18px;
+  height: 18px;
+  opacity: 0.9;
+}
+
+.headDeltaChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  padding: 2px 10px;
+  background: #f5f5f5;
+  font-size: 12px;
+  font-weight: 900;
+  color: #0a0a0a;
+}
+
+.headKpiLabel {
+  color: #6a7282;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.headKpiValueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.headKpiValue {
+  font-size: 28px;
+  font-weight: 900;
+  color: #0a0a0a;
+}
+
+.headKpiMax {
+  color: #6a7282;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.headTabs {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.headTab,
+.headTabActive {
+  border: none;
+  background: transparent;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 14px;
+  line-height: 20px;
+  cursor: pointer;
+  color: #6a7282;
+  font-weight: 800;
+}
+
+.headTabActive {
+  background: #f5f5f5;
+  color: #0a0a0a;
+  border: 1px solid #e5e5e5;
+}
+
+.headChartsRow {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 16px;
+  width: 100%;
+}
+
+.headChartTall {
+  height: 320px;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.headChartWide {
+  height: 320px;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.headThreeGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.headMiniCard {
+  border: 1px solid #e5e5e5;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.headBigValueBlue,
+.headBigValueGreen,
+.headBigValueOrange,
+.headBigValuePurple {
+  font-weight: 900;
+  font-size: 26px;
+  line-height: 30px;
+}
+
+.headBigValueBlue {
+  color: #2563eb;
+}
+
+.headBigValueGreen {
+  color: #16a34a;
+}
+
+.headBigValueOrange {
+  color: #f59e0b;
+}
+
+.headBigValuePurple {
+  color: #8b5cf6;
+}
+
+.headMiniLabel {
+  color: #6a7282;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.headMiniDelta {
+  color: #6a7282;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.headResultsList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.headResultRow {
+  border: 1px solid #e5e5e5;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.headResultValue {
+  font-weight: 900;
+  font-size: 18px;
+  line-height: 22px;
+}
+
+.headResultLabel {
+  color: #6a7282;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+@media (max-width: 1024px) {
+  .chartsRow {
+    grid-template-columns: 1fr;
+  }
+  .kpiGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .teacherKpiGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .teacherProjectsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .headKpiGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .headChartsRow {
+    grid-template-columns: 1fr;
+  }
+  .headThreeGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 768px) {
+  .layout {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    min-height: auto;
+  }
+  .topbar {
+    padding: 12px 16px;
+  }
+  .main {
+    padding: 16px;
+  }
+  .kpiGrid {
+    grid-template-columns: 1fr;
+  }
+  .teacherKpiGrid {
+    grid-template-columns: 1fr;
+  }
+  .teacherProjectsGrid {
+    grid-template-columns: 1fr;
+  }
+  .headKpiGrid {
+    grid-template-columns: 1fr;
+  }
+  .headThreeGrid {
+    grid-template-columns: 1fr;
+  }
+}
