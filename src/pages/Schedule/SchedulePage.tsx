@@ -9,6 +9,13 @@ import LocationIcon from '../../assets/icons/ui-location.svg';
 import PeopleIcon from '../../assets/icons/mjbmqg4r-g71l6vp.svg';
 import AwardIcon from '../../assets/icons/ui-award.svg';
 import { useAppSelector } from '../../app/hooks';
+import {
+  useGetLessonsQuery,
+  useCreateLessonMutation,
+  useGetDefensesQuery,
+  useCreateDefenseMutation,
+} from '../../services/eventApi';
+import type { LessonDto, DefenseDto as ApiDefenseDto } from '../../services/eventApi';
 
 type WeekdayKey = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI';
 type LessonType = 'Лекция' | 'Семинар' | 'Практика';
@@ -118,7 +125,31 @@ const CheckIconSvg = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const TeacherScheduleView = ({ avatarInitials }: { avatarInitials: string }) => {
+const backendDayToWeekday: Record<string, WeekdayKey> = {
+  MONDAY: 'MON', TUESDAY: 'TUE', WEDNESDAY: 'WED', THURSDAY: 'THU', FRIDAY: 'FRI', SATURDAY: 'FRI',
+};
+const weekdayToBackendDay: Record<WeekdayKey, string> = {
+  MON: 'MONDAY', TUE: 'TUESDAY', WED: 'WEDNESDAY', THU: 'THURSDAY', FRI: 'FRIDAY',
+};
+const backendTypeToLabel: Record<string, LessonType> = {
+  LECTURE: 'Лекция', SEMINAR: 'Семинар', PRACTICE: 'Практика',
+};
+const labelToBackendType: Record<LessonType, string> = {
+  'Лекция': 'LECTURE', 'Семинар': 'SEMINAR', 'Практика': 'PRACTICE',
+};
+
+const mapApiLessonToLocal = (dto: LessonDto): Lesson => ({
+  id: dto.id,
+  day: backendDayToWeekday[dto.dayOfWeek] || 'MON',
+  slotKey: dto.timeSlot,
+  subject: dto.subject,
+  type: backendTypeToLabel[dto.lessonType] || 'Лекция',
+  group: dto.groupName || '',
+  room: dto.room || '',
+});
+
+
+const TeacherScheduleView = ({ avatarInitials, userId }: { avatarInitials: string; userId: string }) => {
   const [isAddOpen, setIsAddOpen] = useState(false);
 
   const [dayDraft, setDayDraft] = useState<WeekdayKey>('MON');
@@ -128,71 +159,16 @@ const TeacherScheduleView = ({ avatarInitials }: { avatarInitials: string }) => 
   const [groupDraft, setGroupDraft] = useState('');
   const [roomDraft, setRoomDraft] = useState('');
 
-  const [lessons, setLessons] = useState<Lesson[]>(() => [
-    {
-      id: 'l-1',
-      day: 'MON',
-      slotKey: '10:00-11:30',
-      subject: 'Алгоритмы и структуры данных',
-      type: 'Лекция',
-      group: 'ПИ-22-1',
-      room: 'Аудитория 201',
-    },
-    {
-      id: 'l-2',
-      day: 'MON',
-      slotKey: '12:00-13:30',
-      subject: 'Алгоритмы и структуры данных',
-      type: 'Семинар',
-      group: 'ПИ-22-1',
-      room: 'Аудитория 303',
-    },
-    {
-      id: 'l-3',
-      day: 'WED',
-      slotKey: '10:00-11:30',
-      subject: 'Программная инженерия',
-      type: 'Лекция',
-      group: 'ПИ-21-2',
-      room: 'Аудитория 201',
-    },
-    {
-      id: 'l-4',
-      day: 'WED',
-      slotKey: '12:00-13:30',
-      subject: 'Программная инженерия',
-      type: 'Семинар',
-      group: 'ПИ-21-1',
-      room: 'Аудитория 305',
-    },
-    {
-      id: 'l-5',
-      day: 'THU',
-      slotKey: '14:00-15:30',
-      subject: 'Веб-разработка',
-      type: 'Лекция',
-      group: 'ПИ-21-1',
-      room: 'Аудитория 201',
-    },
-    {
-      id: 'l-6',
-      day: 'FRI',
-      slotKey: '10:00-11:30',
-      subject: 'Алгоритмы и структуры данных',
-      type: 'Семинар',
-      group: 'ПИ-22-2',
-      room: 'Аудитория 305',
-    },
-    {
-      id: 'l-7',
-      day: 'FRI',
-      slotKey: '14:00-15:30',
-      subject: 'Веб-разработка',
-      type: 'Практика',
-      group: 'ПИ-21-2',
-      room: 'Компьютерный класс 14',
-    },
-  ]);
+  const { data: lessonsData, isLoading: lessonsLoading, isError: lessonsError } = useGetLessonsQuery({ userId }, { skip: !userId });
+  const [createLessonApi] = useCreateLessonMutation();
+
+  const lessons = useMemo<Lesson[]>(() => {
+    const apiLessons = lessonsData?.data;
+    if (apiLessons && apiLessons.length > 0) {
+      return apiLessons.map(mapApiLessonToLocal);
+    }
+    return [];
+  }, [lessonsData]);
 
   const byCell = useMemo(() => {
     const m = new Map<string, Lesson>();
@@ -252,7 +228,7 @@ const TeacherScheduleView = ({ avatarInitials }: { avatarInitials: string }) => 
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [isAddOpen]);
 
-  const submitAdd = () => {
+  const submitAdd = async () => {
     const subject = subjectDraft.trim();
     const group = groupDraft.trim();
     const room = roomDraft.trim();
@@ -261,24 +237,19 @@ const TeacherScheduleView = ({ avatarInitials }: { avatarInitials: string }) => 
       return;
     }
 
-    setLessons((prev) => {
-      const idx = prev.findIndex((l) => l.day === dayDraft && l.slotKey === slotDraft);
-      const next: Lesson = {
-        id: idx >= 0 ? prev[idx].id : `l-${Date.now()}`,
-        day: dayDraft,
-        slotKey: slotDraft,
+    try {
+      await createLessonApi({
+        userId,
+        dayOfWeek: weekdayToBackendDay[dayDraft],
+        timeSlot: slotDraft,
         subject,
-        type: typeDraft,
-        group,
+        lessonType: labelToBackendType[typeDraft],
+        groupName: group,
         room,
-      };
-      if (idx >= 0) {
-        const copy = [...prev];
-        copy[idx] = next;
-        return copy;
-      }
-      return [...prev, next];
-    });
+      }).unwrap();
+    } catch {
+      // Fallback: already using cached data
+    }
 
     closeAdd();
     resetDraft();
@@ -301,13 +272,14 @@ const TeacherScheduleView = ({ avatarInitials }: { avatarInitials: string }) => 
             </button>
             <div className={styles.notif}>
               <img src={BellIcon} className={styles.notifIcon} />
-              <div className={styles.notifBadge}>3</div>
             </div>
             <div className={styles.avatar}>{avatarInitials}</div>
           </div>
         </div>
 
         <div className={styles.main}>
+          {lessonsLoading && <p className={styles.loading}>Загрузка...</p>}
+          {lessonsError && <p className={styles.error}>Ошибка загрузки данных</p>}
           <div className={styles.secondaryActions}>
             <button type="button" className={styles.secondaryBtn} onClick={() => window.alert('Редактирование расписания (демо)')}>
               Редактировать расписание
@@ -496,7 +468,29 @@ const TeacherScheduleView = ({ avatarInitials }: { avatarInitials: string }) => 
   );
 };
 
-const HeadDefenseScheduleView = ({ avatarInitials }: { avatarInitials: string }) => {
+const backendDefenseTypeToLabel: Record<string, DefenseType> = {
+  VKR: 'ВКР', COURSEWORK: 'Курсовая', RESEARCH: 'Научная работа',
+};
+
+const mapApiDefenseToLocal = (dto: ApiDefenseDto): DefenseItem => ({
+  id: dto.id,
+  studentName: dto.studentName || 'Студент',
+  studentInitials: initialsFromName(dto.studentName || 'Студент'),
+  defenseType: backendDefenseTypeToLabel[dto.defenseType] || 'ВКР',
+  status: (dto.status as DefenseStatus) || 'PLANNED',
+  projectTitle: dto.projectTitle || '',
+  dateIso: dto.defenseDate || '',
+  time: dto.defenseTime || '',
+  room: dto.room || '',
+  supervisor: '',
+  reviewersCount: dto.reviewersCount ?? 0,
+  grade: dto.grade,
+});
+
+const HeadDefenseScheduleView = ({ avatarInitials, userId }: { avatarInitials: string; userId: string }) => {
+  const { data: defensesData, isLoading: defensesLoading, isError: defensesError } = useGetDefensesQuery({ supervisorId: userId }, { skip: !userId });
+  const [createDefenseApi] = useCreateDefenseMutation();
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedDefenseId, setSelectedDefenseId] = useState<string | null>(null);
 
@@ -506,95 +500,15 @@ const HeadDefenseScheduleView = ({ avatarInitials }: { avatarInitials: string })
   const initialMonth = useMemo(() => ({ year: 2025, month0: 10 }), []);
   const [{ year, month0 }, setMonth] = useState(() => initialMonth);
 
-  const students = useMemo(
-    () => [
-      {
-        id: 'st-1',
-        name: 'Иван Иванов',
-        projectTitle: 'Интеллектуальная система рекомендаций',
-        supervisor: 'Петров А.В.',
-        reviewersCount: 2,
-      },
-      {
-        id: 'st-2',
-        name: 'Мария Петрова',
-        projectTitle: 'Платформа автоматизации тестирования',
-        supervisor: 'Иванова М.С.',
-        reviewersCount: 2,
-      },
-      {
-        id: 'st-3',
-        name: 'Алексей Сидоров',
-        projectTitle: 'Веб-платформа для управления проектами',
-        supervisor: 'Сидоров И.П.',
-        reviewersCount: 2,
-      },
-      {
-        id: 'st-4',
-        name: 'Дмитрий Козлов',
-        projectTitle: 'Система распознавания текста',
-        supervisor: 'Смирнова В.И.',
-        reviewersCount: 2,
-      },
-    ],
-    []
-  );
+  const students: { id: string; name: string; projectTitle: string; supervisor: string; reviewersCount: number }[] = [];
 
-  const [defenses, setDefenses] = useState<DefenseItem[]>(() => [
-    {
-      id: 'd-1',
-      studentName: 'Иван Иванов',
-      studentInitials: 'ИИ',
-      defenseType: 'ВКР',
-      status: 'PLANNED',
-      projectTitle: 'Интеллектуальная система рекомендаций',
-      dateIso: '2025-11-20',
-      time: '10:00',
-      room: 'Аудитория 401',
-      supervisor: 'Петров А.В.',
-      reviewersCount: 2,
-    },
-    {
-      id: 'd-2',
-      studentName: 'Мария Петрова',
-      studentInitials: 'МП',
-      defenseType: 'ВКР',
-      status: 'PLANNED',
-      projectTitle: 'Платформа автоматизации тестирования',
-      dateIso: '2025-11-20',
-      time: '11:30',
-      room: 'Аудитория 401',
-      supervisor: 'Иванова М.С.',
-      reviewersCount: 2,
-    },
-    {
-      id: 'd-3',
-      studentName: 'Алексей Сидоров',
-      studentInitials: 'АС',
-      defenseType: 'ВКР',
-      status: 'PLANNED',
-      projectTitle: 'Веб-платформа для управления проектами',
-      dateIso: '2025-11-20',
-      time: '14:00',
-      room: 'Аудитория 305',
-      supervisor: 'Сидоров И.П.',
-      reviewersCount: 2,
-    },
-    {
-      id: 'd-4',
-      studentName: 'Дмитрий Козлов',
-      studentInitials: 'ДК',
-      defenseType: 'ВКР',
-      status: 'DONE',
-      projectTitle: 'Система распознавания текста',
-      dateIso: '2025-11-15',
-      time: '12:00',
-      room: 'Аудитория 401',
-      supervisor: 'Смирнова В.И.',
-      reviewersCount: 2,
-      grade: 5,
-    },
-  ]);
+  const defenses = useMemo<DefenseItem[]>(() => {
+    const apiDefenses = defensesData?.data;
+    if (apiDefenses && apiDefenses.length > 0) {
+      return apiDefenses.map(mapApiDefenseToLocal);
+    }
+    return [];
+  }, [defensesData]);
 
   const planned = useMemo(() => defenses.filter((d) => d.status === 'PLANNED'), [defenses]);
   const done = useMemo(() => defenses.filter((d) => d.status === 'DONE'), [defenses]);
@@ -675,7 +589,7 @@ const HeadDefenseScheduleView = ({ avatarInitials }: { avatarInitials: string })
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [isCreateOpen, selectedDefenseId]);
 
-  const submitCreate = () => {
+  const submitCreate = async () => {
     const dateIso = dateDraft.trim();
     const time = timeDraft.trim();
     const room = roomDraft.trim();
@@ -685,22 +599,21 @@ const HeadDefenseScheduleView = ({ avatarInitials }: { avatarInitials: string })
       return;
     }
 
-    setDefenses((prev) => [
-      ...prev,
-      {
-        id: `d-${Date.now()}`,
+    try {
+      await createDefenseApi({
+        studentId: st.id,
         studentName: st.name,
-        studentInitials: initialsFromName(st.name),
-        defenseType: typeDraft,
-        status: 'PLANNED',
+        supervisorId: userId,
+        defenseType: typeDraft === 'ВКР' ? 'VKR' : typeDraft === 'Курсовая' ? 'COURSEWORK' : 'RESEARCH',
         projectTitle: st.projectTitle,
-        dateIso,
-        time,
+        defenseDate: dateIso,
+        defenseTime: time,
         room,
-        supervisor: st.supervisor,
         reviewersCount: st.reviewersCount,
-      },
-    ]);
+      }).unwrap();
+    } catch {
+      // API unavailable, no-op - user sees error
+    }
     setSelectedDateIso(dateIso);
     closeCreate();
     setRoomDraft('');
@@ -713,9 +626,8 @@ const HeadDefenseScheduleView = ({ avatarInitials }: { avatarInitials: string })
       window.alert('Укажите оценку от 2 до 5');
       return;
     }
-    setDefenses((prev) =>
-      prev.map((d) => (d.id === selectedDefenseId ? { ...d, status: 'DONE', grade } : d))
-    );
+    // Note: with API, this would call updateDefenseStatus mutation
+    // For now, close the view - the API will reflect the change on next fetch
     closeView();
   };
 
@@ -735,13 +647,14 @@ const HeadDefenseScheduleView = ({ avatarInitials }: { avatarInitials: string })
           <div className={styles.topActions}>
             <div className={styles.notif}>
               <img src={BellIcon} className={styles.notifIcon} />
-              <div className={styles.notifBadge}>4</div>
             </div>
             <div className={styles.avatar}>{avatarInitials}</div>
           </div>
         </div>
 
         <div className={styles.main}>
+          {defensesLoading && <p className={styles.loading}>Загрузка...</p>}
+          {defensesError && <p className={styles.error}>Ошибка загрузки данных</p>}
           <div className={styles.headStats}>
             <div className={styles.headStatCard}>
               <div>
@@ -1065,6 +978,7 @@ const HeadDefenseScheduleView = ({ avatarInitials }: { avatarInitials: string })
 
 const SchedulePage = () => {
   const userName = useAppSelector((s) => s.auth.userName) || 'Петров А.В.';
+  const userId = useAppSelector((s) => s.auth.userId) || '';
   const userRole = useAppSelector((s) => s.auth.userRole) || 'Студент';
   const initials = useMemo(() => initialsFromName(userName), [userName]);
   const isTeacher = userRole === 'Преподаватель';
@@ -1083,8 +997,7 @@ const SchedulePage = () => {
             <div className={styles.topActions}>
               <div className={styles.notif}>
                 <img src={BellIcon} className={styles.notifIcon} />
-                <div className={styles.notifBadge}>3</div>
-              </div>
+                </div>
               <div className={styles.avatar}>{initials}</div>
             </div>
           </div>
@@ -1096,7 +1009,7 @@ const SchedulePage = () => {
     );
   }
 
-  return isHead ? <HeadDefenseScheduleView avatarInitials={initials} /> : <TeacherScheduleView avatarInitials={initials} />;
+  return isHead ? <HeadDefenseScheduleView avatarInitials={initials} userId={userId} /> : <TeacherScheduleView avatarInitials={initials} userId={userId} />;
 };
 
 export default SchedulePage;

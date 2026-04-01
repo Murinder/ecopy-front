@@ -10,6 +10,10 @@ import BoltIcon from '../../assets/icons/ui-bolt.svg';
 import AwardIcon from '../../assets/icons/ui-award.svg';
 import ChatIcon from '../../assets/icons/ui-chat.svg';
 import { useAppSelector } from '../../app/hooks';
+import {
+  useGetLecturerApplicationsQuery,
+  useUpdateApplicationStatusMutation,
+} from '../../services/coreApi';
 
 type RequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 type RequestPriority = 'HIGH' | 'MEDIUM' | 'LOW';
@@ -45,125 +49,41 @@ const priorityLabel = (p: RequestPriority) => (p === 'HIGH' ? 'Высокий' :
 const kindLabel = (k: RequestKind) => (k === 'PROJECT' ? 'Проект' : k === 'CONSULT' ? 'Консультация' : 'ВКР');
 const statusLabel = (s: RequestStatus) => (s === 'PENDING' ? 'На рассмотрении' : s === 'APPROVED' ? 'Одобрено' : 'Отклонено');
 
+
 const ApplicationsPage = () => {
   const userName = useAppSelector((s) => s.auth.userName) || 'Петров А.В.';
   const userRole = useAppSelector((s) => s.auth.userRole) || 'Студент';
+  const userId = useAppSelector((s) => s.auth.userId);
   const initials = useMemo(() => userName.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || 'ИИ', [userName]);
   const isTeacher = userRole === 'Преподаватель' || userRole === 'Заведующий кафедрой';
+
+  const { data: apiApplications, isLoading: appsLoading, isError: appsError } = useGetLecturerApplicationsQuery(userId ?? '', { skip: !userId || !isTeacher });
+  const [updateStatusMutation] = useUpdateApplicationStatusMutation();
 
   const [tab, setTab] = useState<TabKey>('PENDING');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [replyDraft, setReplyDraft] = useState('');
 
-  const [items, setItems] = useState<RequestItem[]>(() => [
-    {
-      id: 'req-1',
-      title: 'Научное руководство дипломным проектом',
-      description:
-        "Прошу стать научным руководителем моего дипломного проекта 'Разработка интеллектуальной системы рекомендаций для образовательной платформы'. Проект предполагает применение методов машинного обучения и анализа данных.",
-      submittedAt: '12.11.2025',
-      status: 'PENDING',
-      priority: 'HIGH',
-      kind: 'PROJECT',
-      student: {
-        initials: 'ИИ',
-        name: 'Иван Иванов',
-        email: 'ivan.ivanov@university.edu',
-        phone: '+7 (999) 123-45-67',
-        group: 'ПИ-21-1',
-        course: '3 курс',
-      },
-      category: 'Дипломный проект',
-      duration: '6 месяцев',
-      teamSize: '1 человек',
-    },
-    {
-      id: 'req-2',
-      title: 'Консультация по курсовому проекту',
-      description:
-        'Необходима консультация по архитектуре веб-приложения для курсового проекта. Хотелось бы обсудить выбор технологического стека и подходы к проектированию.',
-      submittedAt: '13.11.2025',
-      status: 'APPROVED',
-      priority: 'MEDIUM',
-      kind: 'CONSULT',
-      student: {
-        initials: 'МП',
-        name: 'Мария Петрова',
-        email: 'maria.petrova@university.edu',
-        phone: '+7 (999) 555-12-34',
-        group: 'ПИ-21-2',
-        course: '3 курс',
-      },
-      category: 'Курсовой проект',
-      duration: '2 недели',
-      teamSize: '1 человек',
-      teacherReply: 'Давайте созвонимся в четверг, подготовьте список вопросов и текущую схему.',
-    },
-    {
-      id: 'req-3',
-      title: 'Руководство ВКР',
-      description:
-        "Прошу стать руководителем выпускной квалификационной работы на тему 'Разработка системы автоматизации тестирования веб-приложений'. Имею опыт работы в QA и хочу углубить знания в этой области.",
-      submittedAt: '10.11.2025',
-      status: 'REJECTED',
-      priority: 'HIGH',
-      kind: 'VKR',
-      student: {
-        initials: 'АС',
-        name: 'Алексей Сидоров',
-        email: 'alexey.sidorov@university.edu',
-        phone: '+7 (999) 777-77-77',
-        group: 'ПИ-20-1',
-        course: '4 курс',
-      },
-      category: 'ВКР',
-      duration: '4 месяца',
-      teamSize: '1 человек',
-      teacherReply: 'Сейчас нет возможности взять ещё одну ВКР. Попробуйте обратиться к другому преподавателю.',
-    },
-    {
-      id: 'req-4',
-      title: 'Научное руководство дипломным проектом',
-      description:
-        "Прошу рассмотреть возможность руководства дипломным проектом по теме 'Рекомендательная система для университетского портала'. Есть предварительный прототип и датасет.",
-      submittedAt: '09.11.2025',
-      status: 'PENDING',
-      priority: 'MEDIUM',
-      kind: 'PROJECT',
-      student: {
-        initials: 'ЕА',
-        name: 'Екатерина Андреева',
-        email: 'ekaterina.andreeva@university.edu',
-        phone: '+7 (999) 888-88-88',
-        group: 'ПИ-21-3',
-        course: '3 курс',
-      },
-      category: 'Дипломный проект',
-      duration: '6 месяцев',
-      teamSize: '2 человека',
-    },
-    {
-      id: 'req-5',
-      title: 'Консультация по исследовательскому проекту',
-      description:
-        'Нужна консультация по плану эксперимента и метрикам для исследования качества генеративных моделей в обучении.',
-      submittedAt: '08.11.2025',
-      status: 'PENDING',
-      priority: 'LOW',
-      kind: 'CONSULT',
-      student: {
-        initials: 'НК',
-        name: 'Никита Кузнецов',
-        email: 'nikita.kuznetsov@university.edu',
-        phone: '+7 (999) 222-22-22',
-        group: 'ПИ-21-1',
-        course: '3 курс',
-      },
-      category: 'Исследование',
-      duration: '1 неделя',
-      teamSize: '1 человек',
-    },
-  ]);
+  const [items, setItems] = useState<RequestItem[]>([]);
+
+  useEffect(() => {
+    if (apiApplications?.success && apiApplications.data.length > 0) {
+      setItems(apiApplications.data.map((a) => ({
+        id: a.id,
+        title: a.title,
+        description: a.description,
+        submittedAt: a.submittedAt,
+        status: a.status,
+        priority: a.priority,
+        kind: a.kind,
+        student: a.student,
+        category: a.category,
+        duration: a.duration,
+        teamSize: a.teamSize,
+        teacherReply: a.teacherReply,
+      })));
+    }
+  }, [apiApplications]);
 
   const counts = useMemo(() => {
     const c = { pending: 0, approved: 0, rejected: 0, total: items.length };
@@ -201,8 +121,14 @@ const ApplicationsPage = () => {
     );
   };
 
-  const approve = (id: string) => updateStatus(id, 'APPROVED', replyDraft.trim() || undefined);
-  const reject = (id: string) => updateStatus(id, 'REJECTED', replyDraft.trim() || undefined);
+  const approve = (id: string) => {
+    updateStatus(id, 'APPROVED', replyDraft.trim() || undefined);
+    updateStatusMutation({ applicationId: id, status: 'APPROVED', teacherReply: replyDraft.trim() || undefined });
+  };
+  const reject = (id: string) => {
+    updateStatus(id, 'REJECTED', replyDraft.trim() || undefined);
+    updateStatusMutation({ applicationId: id, status: 'REJECTED', teacherReply: replyDraft.trim() || undefined });
+  };
   const clarify = () => {
     window.alert('Запрос уточнений отправлен (демо)');
   };
@@ -229,7 +155,6 @@ const ApplicationsPage = () => {
             <div className={styles.topActions}>
               <div className={styles.notif}>
                 <img src={BellIcon} className={styles.notifIcon} />
-                <div className={styles.notifBadge}>3</div>
               </div>
               <div className={styles.avatar}>{initials}</div>
             </div>
@@ -255,7 +180,6 @@ const ApplicationsPage = () => {
           <div className={styles.topActions}>
             <div className={styles.notif}>
               <img src={BellIcon} className={styles.notifIcon} />
-              <div className={styles.notifBadge}>3</div>
             </div>
             <div className={styles.avatar}>{initials}</div>
           </div>
@@ -332,7 +256,12 @@ const ApplicationsPage = () => {
             </button>
           </div>
 
+          {appsLoading && <p className={styles.loading}>Загрузка...</p>}
+          {appsError && <p className={styles.error}>Ошибка загрузки данных</p>}
           <div className={styles.list}>
+            {!appsLoading && !appsError && list.length === 0 && (
+              <p className={styles.empty}>Нет данных</p>
+            )}
             {list.map((r) => (
               <div key={r.id} className={styles.row} onClick={() => openModal(r.id)} role="button" tabIndex={0} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && openModal(r.id)}>
                 <div className={styles.avatarBig}>{r.student.initials}</div>
@@ -361,7 +290,7 @@ const ApplicationsPage = () => {
                       <button
                         type="button"
                         className={styles.approveBtn}
-                        onClick={() => updateStatus(r.id, 'APPROVED')}
+                        onClick={() => approve(r.id)}
                         disabled={r.status === 'APPROVED'}
                       >
                         ✓ Одобрить
@@ -369,7 +298,7 @@ const ApplicationsPage = () => {
                       <button
                         type="button"
                         className={styles.rejectBtn}
-                        onClick={() => updateStatus(r.id, 'REJECTED')}
+                        onClick={() => reject(r.id)}
                         disabled={r.status === 'REJECTED'}
                       >
                         ✕ Отклонить

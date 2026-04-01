@@ -1,4 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import type { RootState } from '../app/store';
 
 export interface ProjectDto {
   id: string;
@@ -9,6 +10,15 @@ export interface ProjectDto {
   endDate?: string;
   createdBy?: string;
   departmentId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ProjectMemberDto {
+  projectId: string;
+  userId: string;
+  role: 'LEADER' | 'MEMBER';
+  joinedAt?: string;
 }
 
 export interface TaskDto {
@@ -32,7 +42,12 @@ export interface ApiResponse<T> {
 export const projectApi = createApi({
   reducerPath: 'projectApi',
   baseQuery: fetchBaseQuery({
-    baseUrl: 'http://host.docker.internal:8002',
+    baseUrl: 'http://localhost:8080',
+    prepareHeaders: (headers, { getState }) => {
+      const token = (getState() as RootState).auth.token?.accessToken;
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+      return headers;
+    },
   }),
   tagTypes: ['Projects', 'Tasks'],
   endpoints: (builder) => ({
@@ -83,6 +98,10 @@ export const projectApi = createApi({
       }),
       invalidatesTags: ['Tasks'],
     }),
+    getProjectMembers: builder.query<ApiResponse<ProjectMemberDto[]>, string>({
+      query: (projectId) => `/api/v1/projects/${projectId}/members`,
+      providesTags: ['Projects'],
+    }),
   }),
 });
 
@@ -93,4 +112,5 @@ export const {
   useCreateTaskMutation,
   useUpdateTaskMutation,
   useChangeTaskStatusMutation,
+  useGetProjectMembersQuery,
 } = projectApi;

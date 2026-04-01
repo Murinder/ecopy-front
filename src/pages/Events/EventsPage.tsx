@@ -12,6 +12,16 @@ import AddIcon from '../../assets/icons/mjbmqg4r-6km8pgq.svg';
 import FileIcon from '../../assets/icons/ui-file.svg';
 import ChatIcon from '../../assets/icons/ui-chat.svg';
 import { useAppSelector } from '../../app/hooks';
+import {
+  useGetStudentEventsQuery,
+  useGetTeacherEventsQuery,
+  useApplyToEventMutation,
+  useCancelApplicationMutation,
+  useGetMyApplicationsQuery,
+  useGetEventTeamsQuery,
+  useCreateTeamMutation,
+  useJoinTeamMutation,
+} from '../../services/eventApi';
 
 type EventTag = 'Хакатон' | 'Карьера' | 'Обучение';
 
@@ -39,7 +49,7 @@ type TeacherEvent = {
   time: string;
   durationMin: number;
   place: string;
-  participants: string[];
+  participantCount: number;
 };
 
 const monthName = (monthIndex: number) => {
@@ -88,7 +98,11 @@ const initialsFromName = (name: string) => {
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 };
 
+
 const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
+  const userId = useAppSelector((s) => s.auth.userId);
+  const { data: apiEvents, isLoading: eventsLoading, isError: eventsError } = useGetTeacherEventsQuery(userId ?? '', { skip: !userId });
+
   const [teacherViewDate, setTeacherViewDate] = useState(() => new Date(2025, 10, 1));
   const [teacherSelectedId, setTeacherSelectedId] = useState<string | null>(null);
   const [teacherCreateOpen, setTeacherCreateOpen] = useState(false);
@@ -103,63 +117,23 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
   const [teacherCreateParticipants, setTeacherCreateParticipants] = useState('');
   const [teacherCreateOnline, setTeacherCreateOnline] = useState(false);
 
-  const [teacherEvents, setTeacherEvents] = useState<TeacherEvent[]>(() => [
-    {
-      id: 't-e1',
-      type: 'Консультация',
-      title: 'Консультация по дипломному проекту',
-      subtitle: 'Обсуждение архитектуры проекта и текущего прогресса',
-      dateISO: '2025-11-15',
-      time: '14:00',
-      durationMin: 60,
-      place: 'Кабинет 401',
-      participants: ['Иван Иванов'],
-    },
-    {
-      id: 't-e2',
-      type: 'Защита',
-      title: 'Защита курсовых проектов',
-      subtitle: 'Промежуточная защита результатов и обратная связь',
-      dateISO: '2025-11-20',
-      time: '10:00',
-      durationMin: 90,
-      place: 'Аудитория 305',
-      participants: ['Мария Петрова', 'Алексей Сидоров'],
-    },
-    {
-      id: 't-e3',
-      type: 'Семинар',
-      title: "Семинар 'React'",
-      subtitle: 'Разбор практик и архитектурных решений',
-      dateISO: '2025-11-18',
-      time: '16:00',
-      durationMin: 90,
-      place: 'Онлайн (Zoom)',
-      participants: ['Екатерина Андреева', 'Никита Кузнецов'],
-    },
-    {
-      id: 't-e4',
-      type: 'Лекция',
-      title: "Лекция 'Алгоритмы'",
-      subtitle: 'Алгоритмы и структуры данных: повторение и задачи',
-      dateISO: '2025-11-17',
-      time: '12:00',
-      durationMin: 60,
-      place: 'Аудитория 201',
-      participants: ['Группа ПИ-21-1'],
-    },
-    {
-      id: 't-e5',
-      type: 'Консультация',
-      title: 'Консультация по проекту',
-      subtitle: 'Согласование плана работ на неделю',
-      dateISO: '2025-11-16',
-      time: '15:00',
-      durationMin: 45,
-      place: 'Кабинет 401',
-      participants: ['Иван Иванов'],
-    },
-  ]);
+  const [teacherEvents, setTeacherEvents] = useState<TeacherEvent[]>([]);
+
+  useEffect(() => {
+    if (apiEvents?.success && apiEvents.data.length > 0) {
+      setTeacherEvents(apiEvents.data.map((e) => ({
+        id: e.id,
+        type: e.type as TeacherEventType,
+        title: e.title,
+        subtitle: e.subtitle,
+        dateISO: e.dateISO,
+        time: e.time,
+        durationMin: e.durationMin,
+        place: e.place,
+        participantCount: e.participantCount,
+      })));
+    }
+  }, [apiEvents]);
 
   const teacherSelected = useMemo(
     () => (teacherSelectedId ? teacherEvents.find((e) => e.id === teacherSelectedId) || null : null),
@@ -275,10 +249,6 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
     if (!teacherCreateType || !teacherCreateTitle.trim() || !teacherCreateDate || !teacherCreateTime) return;
     const duration = Math.max(5, Number(teacherCreateDuration) || 60);
     const id = `t-${Math.random().toString(16).slice(2)}`;
-    const participants = teacherCreateParticipants
-      .split(',')
-      .map((p) => p.trim())
-      .filter(Boolean);
     setTeacherEvents((prev) => [
       ...prev,
       {
@@ -290,7 +260,7 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
         time: teacherCreateTime,
         durationMin: duration,
         place: teacherCreateOnline ? 'Онлайн (Zoom)' : teacherCreatePlace.trim() || '—',
-        participants,
+        participantCount: 0,
       },
     ]);
     setTeacherCreateOpen(false);
@@ -363,13 +333,14 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
             <div className={styles.topActions}>
               <div className={styles.notif}>
                 <img src={BellIcon} className={styles.notifIcon} />
-                <div className={styles.notifBadge}>7</div>
               </div>
               <div className={styles.avatar}>{avatarInitials}</div>
             </div>
           </div>
 
           <div className={styles.main}>
+            {eventsLoading && <p className={styles.loading}>Загрузка...</p>}
+            {eventsError && <p className={styles.error}>Ошибка загрузки данных</p>}
             <div className={styles.teacherHeaderRow}>
               <div className={styles.teacherMonthNav}>
                 <button type="button" className={styles.teacherNavBtn} onClick={teacherPrevMonth} aria-label="Предыдущий месяц">
@@ -511,19 +482,9 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                 </div>
                 <div>
                   <div className={styles.teacherInfoLabel}>Участники</div>
-                  <div className={styles.teacherInfoValue}>{teacherSelected.participants.length}</div>
+                  <div className={styles.teacherInfoValue}>{teacherSelected.participantCount} чел.</div>
                 </div>
               </div>
-            </div>
-
-            <div className={styles.teacherSectionTitle}>Участники</div>
-            <div className={styles.teacherParticipants}>
-              {teacherSelected.participants.map((p) => (
-                <div key={p} className={styles.teacherParticipantRow}>
-                  <div className={styles.teacherParticipantAvatar}>{initialsFromName(p)}</div>
-                  <div className={styles.teacherParticipantName}>{p}</div>
-                </div>
-              ))}
             </div>
 
             <div className={styles.teacherModalActions}>
@@ -654,94 +615,94 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
   );
 };
 
+
+type AppTab = 'upcoming' | 'past' | 'my';
+
+const STATUS_LABELS: Record<string, string> = {
+  SUBMITTED: 'Заявка отправлена',
+  APPROVED: 'Одобрено',
+  REJECTED: 'Отклонено',
+  WAITLISTED: 'В листе ожидания',
+};
+
+const STATUS_STYLES: Record<string, string> = {
+  SUBMITTED: 'statusPending',
+  APPROVED: 'statusApproved',
+  REJECTED: 'statusRejected',
+  WAITLISTED: 'statusWaitlisted',
+};
+
 const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
-  const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
+  const userId = useAppSelector((s) => s.auth.userId);
+  const { data: apiEvents, isLoading: studentEventsLoading, isError: studentEventsError } = useGetStudentEventsQuery(userId, { skip: false });
+  const { data: myApplicationsData } = useGetMyApplicationsQuery();
+  const [applyToEvent, { isLoading: applyLoading }] = useApplyToEventMutation();
+  const [cancelApplication] = useCancelApplicationMutation();
+
+  const [tab, setTab] = useState<AppTab>('upcoming');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [applyModalEventId, setApplyModalEventId] = useState<string | null>(null);
+  const [applyMotivation, setApplyMotivation] = useState('');
+  const [applySkills, setApplySkills] = useState('');
+  const [applyError, setApplyError] = useState<string | null>(null);
+  const [teamModalEventId, setTeamModalEventId] = useState<string | null>(null);
+  const [createTeamName, setCreateTeamName] = useState('');
+  const [createTeamOpen, setCreateTeamOpen] = useState(false);
+  const [createTeam] = useCreateTeamMutation();
+  const [joinTeam] = useJoinTeamMutation();
 
-  const upcoming = useMemo<EventItem[]>(
-    () => [
-      {
-        id: 'e1',
-        tag: 'Хакатон',
-        title: 'Tech Innovation Hackathon 2025',
-        description:
-          '48-часовой хакатон с фокусом на AI и ML технологии. Участвуйте в командах до 5 человек.',
-        date: '20 ноября 2025 г.',
-        time: '10:00',
-        place: 'Главный корпус, Аудитория 401',
-        participants: '78/100 участников',
-        chips: ['AI', 'ML'],
-        isRegistered: true,
-      },
-      {
-        id: 'e2',
-        tag: 'Карьера',
-        title: "Карьерная ярмарка 'IT Future'",
-        description:
-          'Встреча с представителями ведущих IT-компаний. Узнайте о вакансиях, стажировках и проектах.',
-        date: '25 ноября 2025 г.',
-        time: '14:00',
-        place: 'Конференц-зал',
-        participants: '145/200 участников',
-        chips: ['Карьера', 'Стажировки'],
-      },
-      {
-        id: 'e3',
-        tag: 'Обучение',
-        title: 'Мастер-класс: React и современный Frontend',
-        description:
-          'Практический мастер-класс по разработке современных веб-приложений с фокусом на архитектуру и UX.',
-        date: '28 ноября 2025 г.',
-        time: '16:00',
-        place: 'Онлайн (Zoom)',
-        participants: '56/80 участников',
-        chips: ['React', 'Frontend'],
-        isRegistered: true,
-      },
-    ],
-    []
-  );
+  const myApplications = useMemo(() => myApplicationsData ?? [], [myApplicationsData]);
+  const myApplicationByEventId = useMemo(() => {
+    const map: Record<string, typeof myApplications[0]> = {};
+    myApplications.forEach((a) => { map[a.eventId] = a; });
+    return map;
+  }, [myApplications]);
 
-  const past = useMemo<EventItem[]>(
-    () => [
-      {
-        id: 'p1',
-        tag: 'Карьера',
-        title: 'Вебинар: Портфолио для Junior-разработчика',
-        description: 'Разбор кейсов, структура портфолио и типовые ошибки.',
-        date: '05 октября 2025 г.',
-        time: '18:30',
-        place: 'Онлайн',
-        participants: '220/220 участников',
-        chips: ['Карьера'],
-        isRegistered: true,
-      },
-      {
-        id: 'p2',
-        tag: 'Обучение',
-        title: 'Лекция: Основы алгоритмов и структур данных',
-        description: 'Базовые структуры данных и практические примеры.',
-        date: '12 сентября 2025 г.',
-        time: '12:00',
-        place: 'Аудитория 105',
-        participants: '90/120 участников',
-        chips: ['CS'],
-        isRegistered: true,
-      },
-    ],
-    []
-  );
+  const { data: eventTeamsData } = useGetEventTeamsQuery(teamModalEventId ?? '', { skip: !teamModalEventId });
+  const eventTeams = useMemo(() => eventTeamsData ?? [], [eventTeamsData]);
 
-  const [registered, setRegistered] = useState<Record<string, boolean>>(() => {
-    const r: Record<string, boolean> = {};
-    [...upcoming, ...past].forEach((e) => {
-      if (e.isRegistered) r[e.id] = true;
-    });
-    return r;
-  });
+  const upcoming = useMemo<EventItem[]>(() => {
+    if (apiEvents?.success && apiEvents.data.length > 0) {
+      return apiEvents.data
+        .filter((e) => !e.isPast)
+        .map((e) => ({
+          id: e.id,
+          tag: e.tag as EventTag,
+          title: e.title,
+          description: e.description,
+          date: e.date,
+          time: e.time,
+          place: e.place,
+          participants: e.participants,
+          chips: e.chips,
+          isRegistered: e.isRegistered,
+        }));
+    }
+    return [];
+  }, [apiEvents]);
+
+  const past = useMemo<EventItem[]>(() => {
+    if (apiEvents?.success && apiEvents.data.length > 0) {
+      return apiEvents.data
+        .filter((e) => e.isPast)
+        .map((e) => ({
+          id: e.id,
+          tag: e.tag as EventTag,
+          title: e.title,
+          description: e.description,
+          date: e.date,
+          time: e.time,
+          place: e.place,
+          participants: e.participants,
+          chips: e.chips,
+          isRegistered: e.isRegistered,
+        }));
+    }
+    return [];
+  }, [apiEvents]);
 
   const list = tab === 'upcoming' ? upcoming : past;
-  const counts = { upcoming: upcoming.length, past: past.length };
+  const counts = { upcoming: upcoming.length, past: past.length, my: myApplications.length };
   const allEvents = useMemo(() => [...upcoming, ...past], [upcoming, past]);
   const selected = useMemo(
     () => (selectedId ? allEvents.find((e) => e.id === selectedId) : undefined),
@@ -755,6 +716,42 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
   };
 
   const closeModal = () => setSelectedId(null);
+
+  const openApplyModal = (eventId: string) => {
+    setApplyModalEventId(eventId);
+    setApplyMotivation('');
+    setApplySkills('');
+    setApplyError(null);
+  };
+
+  const closeApplyModal = () => setApplyModalEventId(null);
+
+  const submitApply = async () => {
+    if (!applyModalEventId || !userId) return;
+    setApplyError(null);
+    try {
+      await applyToEvent({ eventId: applyModalEventId, userId, motivation: applyMotivation, skills: applySkills }).unwrap();
+      closeApplyModal();
+    } catch {
+      setApplyError('Ошибка при подаче заявки');
+    }
+  };
+
+  const handleCancelApplication = async (applicationId: string) => {
+    await cancelApplication(applicationId).catch(() => {});
+  };
+
+  const handleJoinTeam = async (teamId: string) => {
+    if (!userId) return;
+    await joinTeam({ teamId, userId, role: 'member' }).catch(() => {});
+  };
+
+  const handleCreateTeam = async () => {
+    if (!teamModalEventId || !createTeamName.trim()) return;
+    await createTeam({ eventId: teamModalEventId, name: createTeamName.trim() }).unwrap().catch(() => {});
+    setCreateTeamName('');
+    setCreateTeamOpen(false);
+  };
 
   useEffect(() => {
     if (!selectedId) return;
@@ -808,7 +805,6 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
               <div className={styles.topActions}>
                 <div className={styles.notif}>
                   <img src={BellIcon} className={styles.notifIcon} />
-                  <div className={styles.notifBadge}>3</div>
                 </div>
               <div className={styles.avatar}>{avatarInitials}</div>
               </div>
@@ -838,86 +834,136 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
               >
                 Прошедшие ({counts.past})
               </div>
+              <div
+                className={`${styles.tab} ${tab === 'my' ? styles.tabActive : ''}`}
+                onClick={() => setTab('my')}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') setTab('my');
+                }}
+              >
+                Мои заявки ({counts.my})
+              </div>
             </div>
 
-            <div className={styles.grid}>
-              {list.map((e, idx) => {
-                const isReg = !!registered[e.id];
-                const placeClass = idx === 0 ? styles.fullLeft : idx === 1 ? styles.fullRight : styles.halfLeft;
-                return (
-                  <div
-                    key={e.id}
-                    className={`${styles.card} ${placeClass}`}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setSelectedId(e.id)}
-                    onKeyDown={(ev) => {
-                      if (ev.key === 'Enter' || ev.key === ' ') setSelectedId(e.id);
-                    }}
-                  >
-                    <div className={styles.cardTop}>
-                      <div className={pillClass(e.tag)}>{e.tag}</div>
-                      {tab === 'upcoming' ? (
-                        isReg ? (
-                          <div className={`${styles.pill} ${styles.statusRegistered}`}>Зарегистрирован</div>
-                        ) : (
-                          <div
-                            className={`${styles.pill} ${styles.statusAction}`}
-                            role="button"
-                            tabIndex={0}
-                            onClick={(clickEv) => {
-                              clickEv.stopPropagation();
-                              setRegistered((p) => ({ ...p, [e.id]: true }));
-                            }}
-                            onKeyDown={(ev) => {
-                              if (ev.key === 'Enter' || ev.key === ' ') {
-                                ev.stopPropagation();
-                                setRegistered((p) => ({ ...p, [e.id]: true }));
-                              }
-                            }}
-                          >
-                            Зарегистрироваться
-                          </div>
-                        )
-                      ) : (
-                        <div className={`${styles.pill} ${styles.statusRegistered}`}>Завершено</div>
-                      )}
-                    </div>
+            {studentEventsLoading && <p className={styles.loading}>Загрузка...</p>}
+            {studentEventsError && <p className={styles.error}>Ошибка загрузки данных</p>}
 
-                    <div className={styles.cardTitle}>{e.title}</div>
-                    <div className={styles.cardDesc}>{e.description}</div>
-
-                    <div className={styles.meta}>
-                      <div className={styles.metaRow}>
-                        <img src={CalendarIcon} className={styles.metaIcon} />
-                        {e.date}
-                      </div>
-                      <div className={styles.metaRow}>
-                        <img src={ScheduleIcon} className={styles.metaIcon} />
-                        {e.time}
-                      </div>
-                      <div className={styles.metaRow}>{e.place}</div>
-                    </div>
-
-                    <div className={styles.cardBottom}>
-                      <div className={styles.participants}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <img src={PeopleIcon} className={styles.metaIcon} />
-                          {e.participants}
+            {tab === 'my' ? (
+              <div className={styles.grid}>
+                {myApplications.length === 0 && <p className={styles.empty}>У вас нет заявок</p>}
+                {myApplications.map((app) => {
+                  const event = allEvents.find((e) => e.id === app.eventId);
+                  const statusKey = app.status;
+                  return (
+                    <div key={app.id} className={`${styles.card} ${styles.halfLeft}`}>
+                      <div className={styles.cardTop}>
+                        {event && <div className={pillClass(event.tag)}>{event.tag}</div>}
+                        <div className={`${styles.pill} ${styles[STATUS_STYLES[statusKey] ?? 'statusPending']}`}>
+                          {STATUS_LABELS[statusKey] ?? statusKey}
                         </div>
                       </div>
-                      <div className={styles.chips}>
-                        {e.chips.map((c) => (
-                          <div key={c} className={styles.chip}>
-                            {c}
+                      <div className={styles.cardTitle}>{event?.title ?? app.eventId}</div>
+                      {event && <div className={styles.cardDesc}>{event.date} · {event.place}</div>}
+                      {app.motivation && <div className={styles.cardDesc} style={{ marginTop: 4, fontStyle: 'italic' }}>{app.motivation}</div>}
+                      {statusKey === 'SUBMITTED' && (
+                        <div className={styles.modalActions} style={{ marginTop: 12 }}>
+                          <button
+                            className={`${styles.actionBtn} ${styles.dangerBtn}`}
+                            onClick={() => handleCancelApplication(app.id)}
+                          >
+                            Отменить заявку
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className={styles.grid}>
+                {!studentEventsLoading && !studentEventsError && list.length === 0 && <p className={styles.empty}>Нет данных</p>}
+                {list.map((e, idx) => {
+                  const existingApp = myApplicationByEventId[e.id];
+                  const placeClass = idx === 0 ? styles.fullLeft : idx === 1 ? styles.fullRight : styles.halfLeft;
+                  return (
+                    <div
+                      key={e.id}
+                      className={`${styles.card} ${placeClass}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelectedId(e.id)}
+                      onKeyDown={(ev) => {
+                        if (ev.key === 'Enter' || ev.key === ' ') setSelectedId(e.id);
+                      }}
+                    >
+                      <div className={styles.cardTop}>
+                        <div className={pillClass(e.tag)}>{e.tag}</div>
+                        {tab === 'upcoming' ? (
+                          existingApp ? (
+                            <div className={`${styles.pill} ${styles[STATUS_STYLES[existingApp.status] ?? 'statusPending']}`}>
+                              {STATUS_LABELS[existingApp.status] ?? existingApp.status}
+                            </div>
+                          ) : (
+                            <div
+                              className={`${styles.pill} ${styles.statusAction}`}
+                              role="button"
+                              tabIndex={0}
+                              onClick={(clickEv) => {
+                                clickEv.stopPropagation();
+                                openApplyModal(e.id);
+                              }}
+                              onKeyDown={(ev) => {
+                                if (ev.key === 'Enter' || ev.key === ' ') {
+                                  ev.stopPropagation();
+                                  openApplyModal(e.id);
+                                }
+                              }}
+                            >
+                              Зарегистрироваться
+                            </div>
+                          )
+                        ) : (
+                          <div className={`${styles.pill} ${styles.statusRegistered}`}>Завершено</div>
+                        )}
+                      </div>
+
+                      <div className={styles.cardTitle}>{e.title}</div>
+                      <div className={styles.cardDesc}>{e.description}</div>
+
+                      <div className={styles.meta}>
+                        <div className={styles.metaRow}>
+                          <img src={CalendarIcon} className={styles.metaIcon} />
+                          {e.date}
+                        </div>
+                        <div className={styles.metaRow}>
+                          <img src={ScheduleIcon} className={styles.metaIcon} />
+                          {e.time}
+                        </div>
+                        <div className={styles.metaRow}>{e.place}</div>
+                      </div>
+
+                      <div className={styles.cardBottom}>
+                        <div className={styles.participants}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <img src={PeopleIcon} className={styles.metaIcon} />
+                            {e.participants}
                           </div>
-                        ))}
+                        </div>
+                        <div className={styles.chips}>
+                          {e.chips.map((c) => (
+                            <div key={c} className={styles.chip}>
+                              {c}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -995,24 +1041,123 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
               ))}
             </div>
 
+            {selected.tag === 'Хакатон' && (
+              <>
+                <div className={styles.sectionLabel}>Команды</div>
+                <div style={{ marginBottom: 8 }}>
+                  {eventTeams.map((team) => (
+                    <div key={team.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f0f0f0' }}>
+                      <span>{team.name}</span>
+                      {team.createdBy !== userId && (
+                        <button className={`${styles.actionBtn} ${styles.mutedBtn}`} style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => handleJoinTeam(team.id)}>
+                          Вступить
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {eventTeams.length === 0 && <p style={{ color: '#888', fontSize: 13 }}>Команд пока нет</p>}
+                </div>
+                {!createTeamOpen ? (
+                  <button
+                    className={`${styles.actionBtn} ${styles.mutedBtn}`}
+                    style={{ marginBottom: 12 }}
+                    onClick={() => { setTeamModalEventId(selected.id); setCreateTeamOpen(true); }}
+                  >
+                    + Создать команду
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                    <input
+                      className={styles.teacherInput}
+                      placeholder="Название команды"
+                      value={createTeamName}
+                      onChange={(e) => setCreateTeamName(e.target.value)}
+                    />
+                    <button className={`${styles.actionBtn} ${styles.mutedBtn}`} onClick={handleCreateTeam} disabled={!createTeamName.trim()}>
+                      Создать
+                    </button>
+                    <button className={`${styles.actionBtn} ${styles.dangerBtn}`} onClick={() => setCreateTeamOpen(false)}>
+                      Отмена
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
             <div className={styles.modalActions}>
-              {registered[selected.id] ? (
-                <button
-                  className={`${styles.actionBtn} ${styles.dangerBtn}`}
-                  onClick={() => setRegistered((p) => ({ ...p, [selected.id]: false }))}
-                >
-                  ⨯ Отменить регистрацию
-                </button>
-              ) : (
-                <button
-                  className={`${styles.actionBtn} ${styles.mutedBtn}`}
-                  onClick={() => setRegistered((p) => ({ ...p, [selected.id]: true }))}
-                >
-                  Зарегистрироваться
-                </button>
-              )}
+              {(() => {
+                const existingApp = myApplicationByEventId[selected.id];
+                if (existingApp) {
+                  return (
+                    <>
+                      <div className={`${styles.pill} ${styles[STATUS_STYLES[existingApp.status] ?? 'statusPending']}`} style={{ alignSelf: 'center' }}>
+                        {STATUS_LABELS[existingApp.status] ?? existingApp.status}
+                      </div>
+                      {existingApp.status === 'SUBMITTED' && (
+                        <button
+                          className={`${styles.actionBtn} ${styles.dangerBtn}`}
+                          onClick={() => handleCancelApplication(existingApp.id)}
+                        >
+                          ⨯ Отменить заявку
+                        </button>
+                      )}
+                    </>
+                  );
+                }
+                return (
+                  <button
+                    className={`${styles.actionBtn} ${styles.mutedBtn}`}
+                    onClick={() => openApplyModal(selected.id)}
+                  >
+                    Зарегистрироваться
+                  </button>
+                );
+              })()}
               <button className={`${styles.actionBtn} ${styles.mutedBtn}`} onClick={() => downloadIcs(selected)}>
                 Добавить в календарь
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {applyModalEventId && (
+        <div className={styles.modalOverlay} onClick={closeApplyModal}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className={styles.modalTop}>
+              <div className={styles.modalTitle} style={{ fontSize: 18 }}>Подать заявку</div>
+              <button className={styles.closeBtn} onClick={closeApplyModal} aria-label="Закрыть">
+                <img src={CloseIcon} className={styles.closeIcon} />
+              </button>
+            </div>
+            <div className={styles.teacherField} style={{ marginTop: 16 }}>
+              <div className={styles.teacherLabel}>Мотивация *</div>
+              <textarea
+                className={styles.teacherTextarea}
+                placeholder="Расскажите, почему хотите участвовать"
+                value={applyMotivation}
+                onChange={(e) => setApplyMotivation(e.target.value)}
+                rows={4}
+              />
+            </div>
+            <div className={styles.teacherField} style={{ marginTop: 12 }}>
+              <div className={styles.teacherLabel}>Навыки</div>
+              <input
+                className={styles.teacherInput}
+                placeholder="Например: Python, ML, React"
+                value={applySkills}
+                onChange={(e) => setApplySkills(e.target.value)}
+              />
+            </div>
+            {applyError && <p style={{ color: '#e53935', fontSize: 13, marginTop: 8 }}>{applyError}</p>}
+            <div className={styles.teacherCreateActions} style={{ marginTop: 20 }}>
+              <button className={styles.teacherCancelBtn} onClick={closeApplyModal}>Отмена</button>
+              <button
+                className={styles.teacherSubmitBtn}
+                onClick={submitApply}
+                disabled={applyLoading || !applyMotivation.trim()}
+              >
+                {applyLoading ? 'Отправка...' : 'Подать заявку'}
               </button>
             </div>
           </div>

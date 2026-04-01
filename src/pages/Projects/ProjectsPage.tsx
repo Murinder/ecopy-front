@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useAppSelector } from '../../app/hooks';
 import styles from './ProjectsPage.module.scss';
 import BellIcon from '../../assets/icons/mjbmqg4r-fcbhx7k.svg';
 import AddIcon from '../../assets/icons/mjbmqg4r-6km8pgq.svg';
@@ -12,7 +12,6 @@ import FileIcon from '../../assets/icons/ui-file.svg';
 import DownloadIcon from '../../assets/icons/ui-download.svg';
 import AwardIcon from '../../assets/icons/ui-award.svg';
 import Sidebar from '../../components/Sidebar';
-import type { RootState } from '../../app/store';
 import {
   useGetUserProjectsQuery,
   useCreateProjectMutation,
@@ -20,6 +19,7 @@ import {
   useCreateTaskMutation,
   useChangeTaskStatusMutation,
   useUpdateTaskMutation,
+  useGetProjectMembersQuery,
 } from '../../services/projectApi';
 import type { TaskDto, ProjectDto } from '../../services/projectApi';
 
@@ -98,20 +98,26 @@ const initialsFromName = (name: string) => {
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 };
 
-const hashToInt = (input: string) => {
-  let h = 0;
-  for (let i = 0; i < input.length; i += 1) {
-    h = (h * 31 + input.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h);
-};
-
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
+const formatRelativeTime = (isoString: string): string => {
+  const diff = Date.now() - new Date(isoString).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins} мин. назад`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} ч. назад`;
+  return `${Math.floor(hours / 24)} д. назад`;
+};
+
+const formatDate = (iso: string | undefined): string => {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('ru-RU');
+};
+
 const ProjectsPage = () => {
-  const userId = useSelector((s: RootState) => s.auth.userId) || '00000000-0000-0000-0000-000000000001';
-  const userName = useSelector((s: RootState) => s.auth.userName) || 'Иван Иванов';
-  const userRole = useSelector((s: RootState) => s.auth.userRole) || 'Студент';
+  const userId = useAppSelector((s) => s.auth.userId) || '00000000-0000-0000-0000-000000000001';
+  const userName = useAppSelector((s) => s.auth.userName) || 'Иван Иванов';
+  const userRole = useAppSelector((s) => s.auth.userRole) || 'Студент';
   const isTeacher = userRole === 'Преподаватель';
   const isHead = userRole === 'Заведующий кафедрой';
   const initials = useMemo(() => initialsFromName(userName), [userName]);
@@ -127,12 +133,27 @@ const ProjectsPage = () => {
   );
 
   const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>(undefined);
+  const [studentTab, setStudentTab] = useState<'all' | 'active' | 'archive'>('all');
   const [teacherTab, setTeacherTab] = useState<TeacherTabKey>('all');
   const [teacherSelectedId, setTeacherSelectedId] = useState<string | null>(null);
   const [teacherCommentDraft, setTeacherCommentDraft] = useState('');
   const [teacherComments, setTeacherComments] = useState<Record<string, string>>({});
   const [headTab, setHeadTab] = useState<HeadTabKey>('all');
   const [headSelectedId, setHeadSelectedId] = useState<string | null>(null);
+
+  const filteredStudentProjects = useMemo(() => {
+    if (studentTab === 'active') return projects.filter((p) => p.status === 'ACTIVE');
+    if (studentTab === 'archive')
+      return projects.filter(
+        (p) => p.status === 'COMPLETED' || p.status === 'FROZEN' || p.status === 'CANCELLED'
+      );
+    return projects;
+  }, [projects, studentTab]);
+
+  const { data: teacherMembersResp } = useGetProjectMembersQuery(
+    teacherSelectedId || '',
+    { skip: !teacherSelectedId }
+  );
 
   const { data: tasksResp, isLoading: tasksLoading, isError: tasksError } = useGetProjectTasksQuery(
     selectedProjectId || '',
@@ -283,30 +304,19 @@ const ProjectsPage = () => {
   const teacherProjects: TeacherProject[] = useMemo(() => {
     const base: TeacherProject[] = projects.length
       ? projects.map((p, idx) => {
-          const h = hashToInt(p.id || String(idx));
           const typeLabel = idx % 3 === 0 ? 'Курсовой проект' : idx % 3 === 1 ? 'Научная работа' : 'Дипломный проект';
-          const tasksTotal = 20 + (h % 10);
-          const tasksDone = clamp(Math.floor((tasksTotal * (45 + (h % 51))) / 100), 1, tasksTotal);
-          const progress = clamp(Math.round((tasksDone / tasksTotal) * 100), 0, 100);
+          const tasksTotal = 0;
+          const tasksDone = 0;
+          const progress = 0;
           const statusRaw = (p.status || '').toUpperCase();
           const statusKey: TeacherStatusKey =
             statusRaw.includes('DONE') || statusRaw.includes('COMPLET') ? 'done' : statusRaw.includes('REVIEW') ? 'review' : 'active';
           const statusLabel = statusKey === 'done' ? 'Завершен' : statusKey === 'review' ? 'На проверке' : 'Активен';
-          const deadline = p.endDate || (idx % 2 === 0 ? '15.12.2025' : '30.11.2025');
-          const updated = idx % 3 === 0 ? '2 часа назад' : idx % 3 === 1 ? '5 часов назад' : '1 день назад';
-          const members: TeacherMember[] = [
-            { initials: 'ИИ', name: 'Иван Иванов', role: 'Team Lead' },
-            { initials: 'МП', name: 'Мария Петрова', role: 'Designer' },
-            { initials: 'АС', name: 'Алексей Сидоров', role: 'Developer' },
-          ];
-          const startDate = '01.09.2025';
-          const stages: TeacherStage[] = [
-            { title: 'Проектирование архитектуры', date: '15.09.2025', done: true },
-            { title: 'Разработка UI/UX', date: '01.10.2025', done: true },
-            { title: 'Backend разработка', date: '20.10.2025', done: true },
-            { title: 'Frontend разработка', date: '15.11.2025', done: false },
-            { title: 'Тестирование', date: '01.12.2025', done: false },
-          ];
+          const deadline = formatDate(p.endDate);
+          const updated = p.updatedAt ? formatRelativeTime(p.updatedAt) : '—';
+          const members: TeacherMember[] = [];
+          const startDate = formatDate(p.startDate);
+          const stages: TeacherStage[] = [];
           return {
             id: p.id,
             typeLabel,
@@ -324,234 +334,31 @@ const ProjectsPage = () => {
             stages,
           } satisfies TeacherProject;
         })
-      : [
-          {
-            id: 't1',
-            typeLabel: 'Курсовой проект',
-            statusLabel: 'Активен',
-            statusKey: 'active',
-            title: 'Разработка мобильного приложения для университета',
-            description: 'Создание образовательного мобильного приложения для iOS и Android с функционалом просмотра расписания, оценок и новостей университета.',
-            members: [
-              { initials: 'ИИ', name: 'Иван Иванов', role: 'Team Lead' },
-              { initials: 'МП', name: 'Мария Петрова', role: 'Designer' },
-              { initials: 'АС', name: 'Алексей Сидоров', role: 'Developer' },
-            ],
-            progress: 75,
-            tasksDone: 15,
-            tasksTotal: 20,
-            startDate: '01.09.2025',
-            deadline: '15.12.2025',
-            updated: '2 часа назад',
-            stages: [
-              { title: 'Проектирование архитектуры', date: '15.09.2025', done: true },
-              { title: 'Разработка UI/UX', date: '01.10.2025', done: true },
-              { title: 'Backend разработка', date: '20.10.2025', done: true },
-              { title: 'Frontend разработка', date: '15.11.2025', done: false },
-              { title: 'Тестирование', date: '01.12.2025', done: false },
-            ],
-          },
-          {
-            id: 't2',
-            typeLabel: 'Научная работа',
-            statusLabel: 'Активен',
-            statusKey: 'active',
-            title: 'Исследование применения AI в образовании',
-            description: 'Научное исследование эффективности применения технологий искусственного интеллекта в образовательном процессе.',
-            members: [
-              { initials: 'МГ', name: 'Михаил Громов', role: 'Researcher' },
-              { initials: 'ОС', name: 'Ольга Соколова', role: 'Analyst' },
-            ],
-            progress: 60,
-            tasksDone: 7,
-            tasksTotal: 12,
-            startDate: '10.09.2025',
-            deadline: '30.11.2025',
-            updated: '5 часов назад',
-            stages: [
-              { title: 'Постановка задачи', date: '15.09.2025', done: true },
-              { title: 'Сбор данных', date: '05.10.2025', done: true },
-              { title: 'Анализ результатов', date: '10.11.2025', done: false },
-              { title: 'Подготовка публикации', date: '25.11.2025', done: false },
-            ],
-          },
-          {
-            id: 't3',
-            typeLabel: 'Дипломный проект',
-            statusLabel: 'На проверке',
-            statusKey: 'review',
-            title: 'Веб-платформа для управления проектами',
-            description: 'Разработка веб-платформы для управления студенческими проектами с функционалом распределения задач и отчётности.',
-            members: [{ initials: 'АС', name: 'Алексей Сидоров', role: 'Developer' }],
-            progress: 90,
-            tasksDone: 23,
-            tasksTotal: 25,
-            startDate: '01.09.2025',
-            deadline: '20.11.2025',
-            updated: '1 день назад',
-            stages: [
-              { title: 'Проектирование', date: '20.09.2025', done: true },
-              { title: 'Реализация', date: '30.10.2025', done: true },
-              { title: 'Подготовка к защите', date: '15.11.2025', done: false },
-            ],
-          },
-          {
-            id: 't4',
-            typeLabel: 'Курсовой проект',
-            statusLabel: 'Задержка',
-            statusKey: 'delay',
-            title: 'Система распознавания рукописного текста',
-            description: 'Разработка системы на базе нейронных сетей для распознавания рукописного текста на русском языке.',
-            members: [
-              { initials: 'ДК', name: 'Дмитрий Ковалев', role: 'ML Engineer' },
-              { initials: 'АВ', name: 'Анна Васильева', role: 'Developer' },
-            ],
-            progress: 45,
-            tasksDone: 6,
-            tasksTotal: 15,
-            startDate: '15.09.2025',
-            deadline: '15.11.2025',
-            updated: '3 дня назад',
-            stages: [
-              { title: 'Сбор датасета', date: '25.09.2025', done: true },
-              { title: 'Обучение модели', date: '20.10.2025', done: false },
-              { title: 'Интеграция', date: '10.11.2025', done: false },
-            ],
-          },
-        ] satisfies TeacherProject[];
+      : [];
 
     return base;
   }, [projects]);
 
   const headProjects = useMemo<HeadProject[]>(
-    () => [
-      {
-        id: 'h1',
-        typeLabel: 'Дипломный проект',
-        isAwarded: true,
-        title: 'Интеллектуальная система рекомендаций для образования',
-        description: 'Система на базе машинного обучения для персонализированных рекомендаций учебных материалов и траекторий обучения.',
-        rating: 4.9,
-        views: 1240,
-        likes: 156,
-        avgScore: 98,
-        curator: 'Петров А.В.',
-        members: [
-          { initials: 'ИИ', name: 'Иван Иванов', role: 'Team Lead' },
-          { initials: 'МП', name: 'Мария Петрова', role: 'ML Engineer' },
-        ],
-        criteria: [
-          { key: 'code', label: 'Качество Кода', value: 95 },
-          { key: 'innov', label: 'Инновационность', value: 98 },
-          { key: 'docs', label: 'Документация', value: 92 },
-          { key: 'pres', label: 'Презентация', value: 96 },
-        ],
-        achievements: ['Победитель университетского конкурса', 'Публикация в научном журнале', 'Внедрение в учебный процесс'],
-        awards: ['Лучший дипломный проект 2025', 'Приз зрительских симпатий'],
-        publications: 1,
-      },
-      {
-        id: 'h2',
-        typeLabel: 'ВКР',
+    () =>
+      projects.map((p, idx) => ({
+        id: p.id,
+        typeLabel: idx % 3 === 0 ? 'Дипломный проект' : idx % 3 === 1 ? 'ВКР' : 'Курсовой проект',
         isAwarded: false,
-        title: 'Платформа для автоматизации тестирования веб-приложений',
-        description: 'Комплексное решение для автоматизированного тестирования с использованием AI для генерации тест-кейсов.',
-        rating: 4.8,
-        views: 980,
-        likes: 124,
-        avgScore: 95,
-        curator: 'Иванова М.С.',
-        members: [
-          { initials: 'АС', name: 'Алексей Сидоров', role: 'Fullstack Developer' },
-          { initials: 'ОС', name: 'Ольга Смирнова', role: 'QA Engineer' },
-        ],
-        criteria: [
-          { key: 'code', label: 'Качество Кода', value: 93 },
-          { key: 'innov', label: 'Инновационность', value: 94 },
-          { key: 'docs', label: 'Документация', value: 96 },
-          { key: 'pres', label: 'Презентация', value: 95 },
-        ],
-        achievements: ['Интеграция в учебные лаборатории', 'Победа в хакатоне кафедры'],
+        title: p.title,
+        description: p.description || '—',
+        rating: 0,
+        views: 0,
+        likes: 0,
+        avgScore: 0,
+        curator: '—',
+        members: [],
+        criteria: [],
+        achievements: [],
         awards: [],
         publications: 0,
-      },
-      {
-        id: 'h3',
-        typeLabel: 'Курсовой проект',
-        isAwarded: false,
-        title: 'Мобильное приложение для управления студенческими проектами',
-        description: 'Кросс-платформенное приложение для iOS и Android с функционалом управления задачами и коллаборации.',
-        rating: 4.7,
-        views: 756,
-        likes: 98,
-        avgScore: 92,
-        curator: 'Сидоров И.П.',
-        members: [
-          { initials: 'ОС', name: 'Олег Сахаров', role: 'Mobile Developer' },
-          { initials: 'ДК', name: 'Дмитрий Козлов', role: 'Designer' },
-        ],
-        criteria: [
-          { key: 'code', label: 'Качество Кода', value: 90 },
-          { key: 'innov', label: 'Инновационность', value: 92 },
-          { key: 'docs', label: 'Документация', value: 89 },
-          { key: 'pres', label: 'Презентация', value: 93 },
-        ],
-        achievements: ['Пилотное внедрение в студенческих командах'],
-        awards: [],
-        publications: 0,
-      },
-      {
-        id: 'h4',
-        typeLabel: 'Научная работа',
-        isAwarded: true,
-        title: 'Система распознавания рукописного текста на русском языке',
-        description: 'Нейросетевая модель для распознавания рукописного текста с точностью до 94% на тестовых данных.',
-        rating: 4.8,
-        views: 1120,
-        likes: 142,
-        avgScore: 94,
-        curator: 'Козлов Д.А.',
-        members: [
-          { initials: 'АВ', name: 'Анна Волкова', role: 'Researcher' },
-          { initials: 'НП', name: 'Никита Платонов', role: 'Data Engineer' },
-        ],
-        criteria: [
-          { key: 'code', label: 'Качество Кода', value: 92 },
-          { key: 'innov', label: 'Инновационность', value: 95 },
-          { key: 'docs', label: 'Документация', value: 90 },
-          { key: 'pres', label: 'Презентация', value: 94 },
-        ],
-        achievements: ['Публикация в сборнике конференции', 'Демонстрация на Дне науки'],
-        awards: ['Лучшая научная работа семестра'],
-        publications: 2,
-      },
-      {
-        id: 'h5',
-        typeLabel: 'Дипломный проект',
-        isAwarded: false,
-        title: 'Blockchain-платформа для верификации дипломов',
-        description: 'Децентрализованная система для выдачи и проверки подлинности образовательных документов.',
-        rating: 4.7,
-        views: 890,
-        likes: 115,
-        avgScore: 93,
-        curator: 'Петров А.В.',
-        members: [
-          { initials: 'ЕМ', name: 'Екатерина Михайлова', role: 'Backend Developer' },
-          { initials: 'СН', name: 'Сергей Никитин', role: 'Blockchain Engineer' },
-        ],
-        criteria: [
-          { key: 'code', label: 'Качество Кода', value: 91 },
-          { key: 'innov', label: 'Инновационность', value: 93 },
-          { key: 'docs', label: 'Документация', value: 90 },
-          { key: 'pres', label: 'Презентация', value: 92 },
-        ],
-        achievements: ['Интеграция с университетской системой', 'Демо для партнеров'],
-        awards: [],
-        publications: 0,
-      },
-    ],
-    []
+      })),
+    [projects]
   );
 
   const headStats = useMemo(() => {
@@ -709,6 +516,8 @@ const ProjectsPage = () => {
                   </div>
 
                   <div className={styles.headList}>
+                    {projectsLoading && <p className={styles.loading}>Загрузка...</p>}
+                    {!projectsLoading && headList.length === 0 && <p className={styles.empty}>Нет данных</p>}
                     {headList.map((p) => (
                       <HeadProjectCard key={p.id} project={p} onOpen={() => setHeadSelectedId(p.id)} />
                     ))}
@@ -751,6 +560,7 @@ const ProjectsPage = () => {
 
                   <div className={styles.teacherGrid}>
                     {projectsLoading && <div style={{ padding: 12 }}>Загрузка проектов...</div>}
+                    {!projectsLoading && teacherList.length === 0 && <p className={styles.empty}>Нет данных</p>}
                     {!projectsLoading &&
                       teacherList.map((p) => (
                         <TeacherProjectCard key={p.id} project={p} onOpen={() => openTeacherModal(p.id)} />
@@ -764,6 +574,11 @@ const ProjectsPage = () => {
                       onChangeComment={setTeacherCommentDraft}
                       onClose={closeTeacherModal}
                       onSendComment={sendTeacherComment}
+                      members={(teacherMembersResp?.data || []).map((m) => ({
+                        initials: m.userId.replace(/-/g, '').slice(0, 2).toUpperCase(),
+                        name: m.role === 'LEADER' ? `Руководитель (${m.userId.slice(0, 8)})` : `Участник (${m.userId.slice(0, 8)})`,
+                        role: m.role === 'LEADER' ? 'Team Lead' : 'Member',
+                      }))}
                     />
                   )}
                 </>
@@ -771,11 +586,27 @@ const ProjectsPage = () => {
                 <>
                   <div className={styles.container8}>
                     <div className={styles.primitiveDiv}>
-                      <div className={styles.primitiveButton}>
+                      <button
+                        type="button"
+                        className={studentTab === 'all' ? styles.primitiveButton : styles.tabInactive}
+                        onClick={() => setStudentTab('all')}
+                      >
                         <p className={styles.a12}>Все проекты</p>
-                      </div>
-                      <p className={styles.a13}>Активные</p>
-                      <p className={styles.a14}>Архив</p>
+                      </button>
+                      <button
+                        type="button"
+                        className={studentTab === 'active' ? styles.primitiveButton : styles.tabInactive}
+                        onClick={() => setStudentTab('active')}
+                      >
+                        <p className={styles.a13}>Активные</p>
+                      </button>
+                      <button
+                        type="button"
+                        className={studentTab === 'archive' ? styles.primitiveButton : styles.tabInactive}
+                        onClick={() => setStudentTab('archive')}
+                      >
+                        <p className={styles.a14}>Архив</p>
+                      </button>
                     </div>
                     <div className={styles.button9} onClick={openCreateProject}>
                       <img src={AddIcon} className={styles.icon4} />
@@ -785,10 +616,13 @@ const ProjectsPage = () => {
 
                   <div className={styles.container29}>
                     {projectsLoading && <div style={{ padding: 12 }}>Загрузка проектов...</div>}
-                    {projects.length === 0 && !projectsLoading && (
+                    {projects.length === 0 && !projectsLoading && studentTab === 'all' && (
                       <DemoProjects onSelect={(id) => setSelectedProjectId(id)} />
                     )}
-                    {projects.map((p) => (
+                    {!projectsLoading && filteredStudentProjects.length === 0 && studentTab !== 'all' && (
+                      <p className={styles.empty}>Нет проектов в этой категории</p>
+                    )}
+                    {filteredStudentProjects.map((p) => (
                       <ProjectCard
                         key={p.id}
                         project={p}
@@ -1189,14 +1023,17 @@ const TeacherProjectModal = ({
   onChangeComment,
   onClose,
   onSendComment,
+  members,
 }: {
   project: TeacherProject | null;
   commentDraft: string;
   onChangeComment: (v: string) => void;
   onClose: () => void;
   onSendComment: () => void;
+  members?: TeacherMember[];
 }) => {
   if (!project) return null;
+  const displayMembers = members && members.length > 0 ? members : project.members;
 
   const statusClass =
     project.statusKey === 'active'
@@ -1238,7 +1075,8 @@ const TeacherProjectModal = ({
 
         <div className={styles.teacherSectionTitle}>Команда проекта</div>
         <div className={styles.teacherTeamGrid}>
-          {project.members.map((m) => (
+          {displayMembers.length === 0 && <p style={{ color: '#737373', fontSize: 14 }}>Нет участников</p>}
+          {displayMembers.map((m) => (
             <div key={m.name} className={styles.teacherTeamCard}>
               <div className={styles.teacherTeamAvatar}>{m.initials}</div>
               <div>

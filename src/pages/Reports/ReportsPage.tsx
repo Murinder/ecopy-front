@@ -11,6 +11,9 @@ import TagIcon from '../../assets/icons/ui-tag.svg';
 import SearchIcon from '../../assets/icons/ui-search.svg';
 import Sidebar from '../../components/Sidebar';
 import { useAppSelector } from '../../app/hooks';
+import { useGetMyReportsQuery, useGenerateReportMutation } from '../../services/reportApi';
+import { useGetUserProjectsQuery } from '../../services/projectApi';
+import type { ReportDto } from '../../services/reportApi';
 
 type ReportStatus = 'DONE' | 'DRAFT';
 
@@ -40,11 +43,36 @@ const initialsFromName = (name: string) =>
     .join('')
     .toUpperCase() || 'ИИ';
 
+const mapReportDtoToItem = (dto: ReportDto): ReportItem => {
+  const params = dto.parameters || {};
+  const genDate = dto.generatedAt ? new Date(dto.generatedAt) : new Date();
+  const dd = String(genDate.getDate()).padStart(2, '0');
+  const mm = String(genDate.getMonth() + 1).padStart(2, '0');
+  const yyyy = String(genDate.getFullYear());
+  return {
+    id: dto.id,
+    type: (params.type as string) || dto.reportType || '',
+    title: (params.title as string) || dto.reportType || 'Отчет',
+    description: (params.description as string) || dto.errorMessage || '',
+    status: dto.status === 'COMPLETED' ? 'DONE' : 'DRAFT',
+    project: (params.project as string) || undefined,
+    date: `${dd}.${mm}.${yyyy}`,
+    from: (params.from as string) || undefined,
+    to: (params.to as string) || undefined,
+    notes: (params.notes as string) || undefined,
+  };
+};
+
 const ReportsPage = () => {
   const userName = useAppSelector((s) => s.auth.userName) || 'Петров А.В.';
   const userRole = useAppSelector((s) => s.auth.userRole) || 'Студент';
+  const userId = useAppSelector((s) => s.auth.userId);
   const isTeacher = userRole === 'Преподаватель' || userRole === 'Заведующий кафедрой';
   const initials = useMemo(() => initialsFromName(userName), [userName]);
+
+  const { data: reportsData, isLoading: reportsLoading, isError: reportsError } = useGetMyReportsQuery();
+  const { data: projectsResp } = useGetUserProjectsQuery(userId ?? '', { skip: !userId });
+  const [generateReportApi] = useGenerateReportMutation();
 
   const [query, setQuery] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -58,57 +86,13 @@ const ReportsPage = () => {
   const [createNotes, setCreateNotes] = useState('');
   const [createErrors, setCreateErrors] = useState<{ type?: string; title?: string; period?: string }>({});
 
-  const [reports, setReports] = useState<ReportItem[]>(() => [
-    {
-      id: 'r1',
-      type: 'Курс',
-      title: "Отчет по курсу 'Программная инженерия'",
-      description: 'Завершен семестр. Средний балл группы: 4.3. Успеваемость 95%. Все студенты сдали итоговый проект.',
-      status: 'DONE',
-      project: 'ПИ-21-1',
-      date: '10.11.2025',
-      students: ['Иван Иванов', 'Мария Петрова', 'Алексей Сидоров'],
-      eduMetrics: { students: 3, avgGrade: 4.3, successRate: 95 },
-    },
-    {
-      id: 'r2',
-      type: 'Проектная деятельность',
-      title: 'Промежуточный отчет по проекту',
-      description: 'Проект выполнен на 75%. Команда работает эффективно, соблюдаются дедлайны.',
-      status: 'DONE',
-      project: 'Мобильное приложение',
-      date: '13.11.2025',
-      metrics: { tasksDone: 12, progress: 75, hours: 32 },
-    },
-    {
-      id: 'r3',
-      type: 'Консультации',
-      title: 'Отчет о проведенных консультациях',
-      description: 'За месяц проведено 24 консультации. Основные темы: веб-разработка, базы данных, алгоритмы.',
-      status: 'DONE',
-      date: '05.11.2025',
-      metrics: { tasksDone: 24, progress: 100, hours: 18 },
-    },
-    {
-      id: 'r4',
-      type: 'Академическая отчетность',
-      title: 'Статистика успеваемости за семестр',
-      description: 'Подготовка итогового отчета по успеваемости студентов 3 курса.',
-      status: 'DRAFT',
-      project: 'ПИ-21-1',
-      date: '01.11.2025',
-      eduMetrics: { students: 28, avgGrade: 4.1, successRate: 92 },
-    },
-    {
-      id: 'r5',
-      type: 'Защиты работ',
-      title: 'Отчет по защитам курсовых работ',
-      description: 'Проведено 45 защит курсовых работ. Средний балл: 4.5. Отличных работ: 15.',
-      status: 'DONE',
-      date: '28.10.2025',
-      metrics: { tasksDone: 45, progress: 100, hours: 12 },
-    },
-  ]);
+  const apiReports = useMemo(
+    () => (reportsData?.data || []).map(mapReportDtoToItem),
+    [reportsData],
+  );
+
+  const [localReports, setLocalReports] = useState<ReportItem[]>([]);
+  const reports = apiReports.length > 0 ? apiReports : localReports;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -142,7 +126,7 @@ const ReportsPage = () => {
 
   const openCreate = () => setIsCreateOpen(true);
 
-  const submitCreate = () => {
+  const submitCreate = async () => {
     const nextErrors: { type?: string; title?: string; period?: string } = {};
     if (!createType) nextErrors.type = 'Выберите тип отчета';
     if (!createTitle.trim()) nextErrors.title = 'Введите название отчета';
@@ -150,27 +134,43 @@ const ReportsPage = () => {
     setCreateErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
 
-    const now = new Date();
-    const dd = String(now.getDate()).padStart(2, '0');
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const yyyy = String(now.getFullYear());
-    const date = `${dd}.${mm}.${yyyy}`;
+    try {
+      await generateReportApi({
+        reportType: createType,
+        parameters: {
+          title: createTitle.trim(),
+          type: createType,
+          from: createFrom || undefined,
+          to: createTo || undefined,
+          project: createProject || undefined,
+          notes: createNotes || undefined,
+        },
+        format: 'XLSX',
+      }).unwrap();
+      closeCreate();
+    } catch {
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, '0');
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const yyyy = String(now.getFullYear());
+      const date = `${dd}.${mm}.${yyyy}`;
 
-    const created: ReportItem = {
-      id: `local-${Date.now()}`,
-      type: createType,
-      title: createTitle.trim(),
-      description: 'Отчет будет сгенерирован автоматически на основе выбранного периода и данных.',
-      status: 'DRAFT',
-      project: createProject || undefined,
-      date,
-      from: createFrom || undefined,
-      to: createTo || undefined,
-      notes: createNotes || undefined,
-      metrics: { tasksDone: 0, progress: 0, hours: 0 },
-    };
-    setReports((prev) => [created, ...prev]);
-    closeCreate();
+      const created: ReportItem = {
+        id: `local-${Date.now()}`,
+        type: createType,
+        title: createTitle.trim(),
+        description: 'Отчет будет сгенерирован автоматически на основе выбранного периода и данных.',
+        status: 'DRAFT',
+        project: createProject || undefined,
+        date,
+        from: createFrom || undefined,
+        to: createTo || undefined,
+        notes: createNotes || undefined,
+        metrics: { tasksDone: 0, progress: 0, hours: 0 },
+      };
+      setLocalReports((prev) => [created, ...prev]);
+      closeCreate();
+    }
   };
 
   const downloadReport = (report: ReportItem, asPdf: boolean) => {
@@ -226,7 +226,6 @@ const ReportsPage = () => {
             <div className={styles.topActions}>
               <div className={styles.notif}>
                 <img src={BellIcon} className={styles.notifIcon} />
-                <div className={styles.notifBadge}>3</div>
               </div>
               <div className={styles.avatar}>{initials}</div>
             </div>
@@ -253,7 +252,6 @@ const ReportsPage = () => {
           <div className={styles.topActions}>
             <div className={styles.notif}>
               <img src={BellIcon} className={styles.notifIcon} />
-              <div className={styles.notifBadge}>3</div>
             </div>
             <div className={styles.avatar}>{initials}</div>
           </div>
@@ -321,6 +319,11 @@ const ReportsPage = () => {
               <div className={styles.panelSub}>Найдено отчетов: {filtered.length}</div>
             </div>
             <div className={styles.list}>
+              {reportsLoading && <p className={styles.loading}>Загрузка...</p>}
+              {reportsError && <p className={styles.error}>Ошибка загрузки данных</p>}
+              {!reportsLoading && !reportsError && filtered.length === 0 && (
+                <p className={styles.empty}>Нет данных</p>
+              )}
               {filtered.map((r) => (
                 <div key={r.id} className={styles.row}>
                   <div className={styles.fileIconWrap}>
@@ -409,10 +412,9 @@ const ReportsPage = () => {
                 <div className={styles.fieldLabel}>Группа/Проект (опционально)</div>
                 <select className={styles.select} value={createProject} onChange={(e) => setCreateProject(e.target.value)}>
                   <option value="">Выберите группу или проект</option>
-                  <option value="ПИ-21-1">ПИ-21-1</option>
-                  <option value="ПИ-21-2">ПИ-21-2</option>
-                  <option value="Мобильное приложение">Мобильное приложение</option>
-                  <option value="Исследование AI">Исследование AI</option>
+                  {(projectsResp?.data || []).map((p) => (
+                    <option key={p.id} value={p.title}>{p.title}</option>
+                  ))}
                 </select>
               </div>
               <div>

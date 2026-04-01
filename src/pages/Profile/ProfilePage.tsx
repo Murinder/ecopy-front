@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styles from './ProfilePage.module.scss';
 import BellIcon from '../../assets/icons/mjbmqg4r-fcbhx7k.svg';
@@ -15,6 +15,20 @@ import PeopleIcon from '../../assets/icons/mjbmqg4r-g71l6vp.svg';
 import FileIcon from '../../assets/icons/ui-file.svg';
 import Sidebar from '../../components/Sidebar';
 import { useAppSelector } from '../../app/hooks';
+import {
+  useGetProfileQuery,
+  useUpdateProfileMutation,
+  useGetUserLinksQuery,
+  useCreateUserLinkMutation,
+  useUpdateUserLinkMutation,
+  useDeleteUserLinkMutation,
+  useGetUserSkillsQuery,
+  useCreateUserSkillMutation,
+  useDeleteUserSkillMutation,
+  useGetUserLanguagesQuery,
+  useCreateUserLanguageMutation,
+  useDeleteUserLanguageMutation,
+} from '../../services/coreApi';
 
 const initialsFromName = (name: string) =>
   name
@@ -112,43 +126,75 @@ type HeadProfile = {
   admin: { teachers: number; students: number; yearsLeading: number };
 };
 
-const StudentProfileView = ({ userName }: { userName: string }) => {
+const StudentProfileView = ({ userName, userId }: { userName: string; userId: string }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { data: profileData, isLoading, isError } = useGetProfileQuery(userId, { skip: !userId });
+  const { data: linksData } = useGetUserLinksQuery(userId, { skip: !userId });
+  const { data: skillsData } = useGetUserSkillsQuery(userId, { skip: !userId });
+  const { data: languagesData } = useGetUserLanguagesQuery(userId, { skip: !userId });
+  const [updateProfileApi] = useUpdateProfileMutation();
+  const [createUserLink] = useCreateUserLinkMutation();
+  const [updateUserLink] = useUpdateUserLinkMutation();
+  const [deleteUserLink] = useDeleteUserLinkMutation();
+  const [createUserSkill] = useCreateUserSkillMutation();
+  const [deleteUserSkill] = useDeleteUserSkillMutation();
+  const [createUserLanguage] = useCreateUserLanguageMutation();
+  const [deleteUserLanguage] = useDeleteUserLanguageMutation();
 
-  const initial = useMemo<Profile>(
-    () => ({
-      fullName: userName || 'Иванов Иван Петрович',
-      track: 'Программная инженерия',
-      course: '3 курс',
-      group: 'Группа БСБО-04-22',
-      role: 'Студент',
-      studentId: '2021-IT-12345',
-      form: 'Очная',
-      about:
-        'Студент 3 курса, увлекаюсь веб-разработкой и искусственным интеллектом. Активно участвую в хакатонах и открытых проектах.',
-      email: 'ivan.ivanov@university.edu',
-      phone: '+7 (999) 123-45-67',
-      address: 'г. Москва, ул. Ленина, д. 10, кв. 25',
-      birthDate: '2003-05-15',
-      github: 'https://github.com/ivanov',
-      linkedin: 'https://linkedin.com/in/ivanov',
-      portfolio: 'https://ivanov.dev',
-      faculty: 'Факультет информационных технологий',
-      department: 'Кафедра программной инженерии',
-      direction: 'Программная инженерия',
-      admissionYear: '2021',
-      emergencyName: 'Иванова Мария Сергеевна (мать)',
-      emergencyPhone: '+7 (999) 987-65-43',
-      skills: ['JavaScript', 'TypeScript', 'React', 'Node.js', 'Python', 'Machine Learning'],
-      languages: ['Русский (родной)', 'Английский (B2)', 'Немецкий (A2)'],
-      interests: ['Программирование', 'AI/ML', 'Открытые технологии', 'Спорт'],
-    }),
-    [userName]
-  );
+  const initial = useMemo<Profile>(() => {
+    const d = profileData?.data;
+    const github = linksData?.find(l => l.linkType === 'GITHUB')?.url ?? '';
+    const linkedin = linksData?.find(l => l.linkType === 'LINKEDIN')?.url ?? '';
+    const portfolio = linksData?.find(l => l.linkType === 'PORTFOLIO')?.url ?? '';
+    const skills = skillsData?.map(s => s.skillName) ?? [];
+    const languages = languagesData?.map(l => l.language) ?? [];
+    if (d) {
+      return {
+        fullName: [d.firstName, d.lastName].filter(Boolean).join(' ') || userName || '',
+        track: d.studyProgram || '',
+        course: d.currentSemester ? `${Math.ceil(d.currentSemester / 2)} курс` : '',
+        group: d.groupName ? `Группа ${d.groupName}` : '',
+        role: 'Студент',
+        studentId: d.id || '',
+        form: 'Очная',
+        about: d.bio || '',
+        email: d.email || '',
+        phone: d.phoneNumber || '',
+        address: d.address || '',
+        birthDate: d.birthDate || '',
+        github,
+        linkedin,
+        portfolio,
+        faculty: '',
+        department: '',
+        direction: d.studyProgram || '',
+        admissionYear: d.enrollmentYear ? String(d.enrollmentYear) : '',
+        emergencyName: '',
+        emergencyPhone: '',
+        skills,
+        languages,
+        interests: [],
+      };
+    }
+    return {
+      fullName: userName || '',
+      track: '', course: '', group: '', role: 'Студент', studentId: '', form: 'Очная',
+      about: '', email: '', phone: '', address: '', birthDate: '',
+      github, linkedin, portfolio, faculty: '', department: '',
+      direction: '', admissionYear: '', emergencyName: '', emergencyPhone: '',
+      skills, languages, interests: [],
+    };
+  }, [profileData, linksData, skillsData, languagesData, userName]);
 
   const [profile, setProfile] = useState<Profile>(initial);
   const [draft, setDraft] = useState<Profile>(initial);
+
+  useEffect(() => {
+    setProfile(initial);
+    setDraft(initial);
+  }, [initial]);
+
   const initials = useMemo(() => initialsFromName(profile.fullName), [profile.fullName]);
 
   const startEdit = () => {
@@ -157,7 +203,7 @@ const StudentProfileView = ({ userName }: { userName: string }) => {
     setIsEditing(true);
   };
 
-  const save = () => {
+  const save = async () => {
     const errors: string[] = [];
     if (!draft.email.trim()) errors.push('Email обязателен');
     if (!draft.phone.trim()) errors.push('Телефон обязателен');
@@ -166,9 +212,61 @@ const StudentProfileView = ({ userName }: { userName: string }) => {
       setError(errors.join(' • '));
       return;
     }
-    setProfile(draft);
-    setIsEditing(false);
-    setError(null);
+    try {
+      const nameParts = draft.fullName.trim().split(/\s+/);
+      await updateProfileApi({
+        userId,
+        data: {
+          firstName: nameParts[0] || '',
+          lastName: nameParts[1] || '',
+          email: draft.email,
+          phoneNumber: draft.phone,
+          address: draft.address,
+          bio: draft.about,
+          birthDate: draft.birthDate || undefined,
+        },
+      }).unwrap();
+
+      const linkOps: Promise<unknown>[] = [];
+      for (const [field, linkType] of [
+        ['github', 'GITHUB'],
+        ['linkedin', 'LINKEDIN'],
+        ['portfolio', 'PORTFOLIO'],
+      ] as const) {
+        const oldUrl = profile[field];
+        const newUrl = draft[field].trim();
+        if (newUrl === oldUrl) continue;
+        if (newUrl && !oldUrl) {
+          linkOps.push(createUserLink({ userId, linkType, url: newUrl }).unwrap());
+        } else if (newUrl && oldUrl) {
+          linkOps.push(updateUserLink({ userId, linkType, url: newUrl }).unwrap());
+        } else if (!newUrl && oldUrl) {
+          linkOps.push(deleteUserLink({ userId, linkType }).unwrap());
+        }
+      }
+
+      const addedSkills = draft.skills.filter(s => !profile.skills.includes(s));
+      const removedSkills = profile.skills.filter(s => !draft.skills.includes(s));
+      const skillOps = [
+        ...addedSkills.map(s => createUserSkill({ userId, skillName: s, level: 1, verified: false }).unwrap()),
+        ...removedSkills.map(s => deleteUserSkill({ userId, skillName: s }).unwrap()),
+      ];
+
+      const addedLangs = draft.languages.filter(l => !profile.languages.includes(l));
+      const removedLangs = profile.languages.filter(l => !draft.languages.includes(l));
+      const langOps = [
+        ...addedLangs.map(l => createUserLanguage({ userId, language: l, proficiency: 'INTERMEDIATE' }).unwrap()),
+        ...removedLangs.map(l => deleteUserLanguage({ userId, language: l }).unwrap()),
+      ];
+
+      await Promise.all([...linkOps, ...skillOps, ...langOps]);
+
+      setProfile(draft);
+      setIsEditing(false);
+      setError(null);
+    } catch {
+      setError('Ошибка при сохранении профиля');
+    }
   };
 
   const addSkill = () => {
@@ -176,6 +274,42 @@ const StudentProfileView = ({ userName }: { userName: string }) => {
     if (!name) return;
     setDraft((p) => ({ ...p, skills: [...p.skills, name.trim()].filter(Boolean) }));
   };
+
+  const removeSkill = (name: string) => {
+    setDraft((p) => ({ ...p, skills: p.skills.filter(s => s !== name) }));
+  };
+
+  const addLanguage = () => {
+    const name = window.prompt('Введите язык');
+    if (!name) return;
+    setDraft((p) => ({ ...p, languages: [...p.languages, name.trim()].filter(Boolean) }));
+  };
+
+  if (isLoading) {
+    return (
+      <div className={styles.page}>
+        <Sidebar />
+        <div className={styles.content}>
+          <div className={styles.main} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div>Загрузка профиля...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError && !profile.fullName) {
+    return (
+      <div className={styles.page}>
+        <Sidebar />
+        <div className={styles.content}>
+          <div className={styles.main} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div>Ошибка загрузки профиля. Попробуйте позже.</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.page}>
@@ -190,7 +324,6 @@ const StudentProfileView = ({ userName }: { userName: string }) => {
           <div className={styles.topActions}>
             <div className={styles.notif}>
               <img src={BellIcon} className={styles.notifIcon} />
-              <div className={styles.notifBadge}>3</div>
             </div>
             <div className={styles.avatarSmall}>{initials}</div>
           </div>
@@ -276,7 +409,7 @@ const StudentProfileView = ({ userName }: { userName: string }) => {
                     <input className={styles.input} type="date" value={draft.birthDate} onChange={(e) => setDraft((p) => ({ ...p, birthDate: e.target.value }))} />
                   ) : (
                     <div className={styles.kvValue}>
-                      {new Date(profile.birthDate).toLocaleDateString('ru-RU')}
+                      {profile.birthDate ? new Date(profile.birthDate).toLocaleDateString('ru-RU') : '—'}
                     </div>
                   )}
                 </div>
@@ -352,19 +485,19 @@ const StudentProfileView = ({ userName }: { userName: string }) => {
               <div className={styles.cardTitle} style={{ marginTop: 14 }}>Успеваемость</div>
               <div className={styles.progressRow}>
                 <div className={styles.mini}>
-                  <div className={styles.miniValue} style={{ color: '#3a76f0' }}>4.6</div>
+                  <div className={styles.miniValue} style={{ color: '#3a76f0' }}>—</div>
                   <div className={styles.miniLabel}>Средний балл</div>
                 </div>
                 <div className={styles.mini}>
-                  <div className={styles.miniValue} style={{ color: '#16a34a' }}>135</div>
+                  <div className={styles.miniValue} style={{ color: '#16a34a' }}>—</div>
                   <div className={styles.miniLabel}>Кредитов</div>
                 </div>
                 <div className={styles.mini}>
-                  <div className={styles.miniValue} style={{ color: '#8b5cf6' }}>6</div>
+                  <div className={styles.miniValue} style={{ color: '#8b5cf6' }}>{profile.course || '—'}</div>
                   <div className={styles.miniLabel}>Семестр</div>
                 </div>
                 <div className={styles.mini}>
-                  <div className={styles.miniValue} style={{ color: '#f97316' }}>75%</div>
+                  <div className={styles.miniValue} style={{ color: '#f97316' }}>—</div>
                   <div className={styles.miniLabel}>Прогресс</div>
                 </div>
               </div>
@@ -417,6 +550,16 @@ const StudentProfileView = ({ userName }: { userName: string }) => {
                     {(isEditing ? draft.skills : profile.skills).map((s) => (
                       <span key={s} className={styles.chip}>
                         {s}
+                        {isEditing && (
+                          <span
+                            onClick={() => removeSkill(s)}
+                            role="button"
+                            tabIndex={0}
+                            style={{ marginLeft: 6, cursor: 'pointer', opacity: 0.6 }}
+                          >
+                            ×
+                          </span>
+                        )}
                       </span>
                     ))}
                     {isEditing && (
@@ -428,10 +571,27 @@ const StudentProfileView = ({ userName }: { userName: string }) => {
                 </div>
                 <div>
                   <div className={styles.kvLabel}>Языки</div>
-                  <div className={styles.list}>
+                  <div className={styles.chips}>
                     {(isEditing ? draft.languages : profile.languages).map((l) => (
-                      <div key={l}>• {l}</div>
+                      <span key={l} className={styles.chip}>
+                        {l}
+                        {isEditing && (
+                          <span
+                            onClick={() => setDraft((p) => ({ ...p, languages: p.languages.filter(x => x !== l) }))}
+                            role="button"
+                            tabIndex={0}
+                            style={{ marginLeft: 6, cursor: 'pointer', opacity: 0.6 }}
+                          >
+                            ×
+                          </span>
+                        )}
+                      </span>
                     ))}
+                    {isEditing && (
+                      <span className={`${styles.chip} ${styles.addChip}`} onClick={addLanguage} role="button" tabIndex={0}>
+                        + Добавить
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div>
@@ -453,21 +613,27 @@ const StudentProfileView = ({ userName }: { userName: string }) => {
   );
 };
 
-const HeadProfileView = ({ userName }: { userName: string }) => {
+const HeadProfileView = ({ userName, userId }: { userName: string; userId: string }) => {
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { data: profileData } = useGetProfileQuery(userId, { skip: !userId });
+  const [updateProfileApi] = useUpdateProfileMutation();
+
+  const apiName = profileData?.data
+    ? [profileData.data.firstName, profileData.data.lastName].filter(Boolean).join(' ')
+    : '';
 
   const initial = useMemo<HeadProfile>(
     () => ({
-      fullName: userName?.trim() || 'Смирнов Владимир Игоревич',
+      fullName: apiName || userName?.trim() || 'Смирнов Владимир Игоревич',
       role: 'Заведующий кафедрой',
       degree: 'Доктор технических наук',
       title: 'Профессор',
       headSince: '2015',
       headId: 'H-2015-234',
-      email: 'v.smirnov@university.edu',
-      phone: '+7 (999) 111-22-33',
+      email: profileData?.data?.email || 'v.smirnov@university.edu',
+      phone: profileData?.data?.phoneNumber || '+7 (999) 111-22-33',
       faculty: 'Факультет информационных технологий',
       department: 'Кафедра программной инженерии',
       dissertationTitle: 'Методы оптимизации распределенных систем обработки данных',
@@ -499,11 +665,17 @@ const HeadProfileView = ({ userName }: { userName: string }) => {
       leadership: { phd: 12, masters: 45, bachelors: 156 },
       admin: { teachers: 24, students: 342, yearsLeading: 10 },
     }),
-    [userName]
+    [userName, apiName, profileData]
   );
 
   const [profile, setProfile] = useState<HeadProfile>(initial);
   const [draft, setDraft] = useState<HeadProfile>(initial);
+
+  useEffect(() => {
+    setProfile(initial);
+    setDraft(initial);
+  }, [initial]);
+
   const initials = useMemo(() => initialsFromName(profile.fullName), [profile.fullName]);
 
   const startEdit = () => {
@@ -512,7 +684,7 @@ const HeadProfileView = ({ userName }: { userName: string }) => {
     setIsEditing(true);
   };
 
-  const save = () => {
+  const save = async () => {
     const errors: string[] = [];
     if (!draft.fullName.trim()) errors.push('ФИО обязательно');
     if (!draft.email.trim()) errors.push('Email обязателен');
@@ -521,9 +693,23 @@ const HeadProfileView = ({ userName }: { userName: string }) => {
       setError(errors.join(' • '));
       return;
     }
-    setProfile(draft);
-    setIsEditing(false);
-    setError(null);
+    try {
+      const nameParts = draft.fullName.trim().split(/\s+/);
+      await updateProfileApi({
+        userId,
+        data: {
+          firstName: nameParts[0] || '',
+          lastName: nameParts[1] || '',
+          email: draft.email,
+          phoneNumber: draft.phone,
+        },
+      }).unwrap();
+      setProfile(draft);
+      setIsEditing(false);
+      setError(null);
+    } catch {
+      setError('Ошибка при сохранении профиля');
+    }
   };
 
   const openDemo = (label: string) => window.alert(`${label} (демо)`);
@@ -541,7 +727,6 @@ const HeadProfileView = ({ userName }: { userName: string }) => {
           <div className={styles.topActions}>
             <div className={styles.notif}>
               <img src={BellIcon} className={styles.notifIcon} />
-              <div className={styles.notifBadge}>4</div>
             </div>
             <div className={styles.avatarSmall}>{initials}</div>
           </div>
@@ -811,13 +996,19 @@ const HeadProfileView = ({ userName }: { userName: string }) => {
   );
 };
 
-const TeacherProfileView = ({ userName }: { userName: string }) => {
+const TeacherProfileView = ({ userName, userId }: { userName: string; userId: string }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { data: profileData } = useGetProfileQuery(userId, { skip: !userId });
+  const [updateProfileApi] = useUpdateProfileMutation();
+
+  const apiName = profileData?.data
+    ? [profileData.data.firstName, profileData.data.lastName].filter(Boolean).join(' ')
+    : '';
 
   const initial = useMemo<TeacherProfile>(
     () => ({
-      fullName: userName || 'Петров Александр Владимирович',
+      fullName: apiName || userName || 'Петров Александр Владимирович',
       position: 'Доцент',
       degree: 'Кандидат технических наук',
       role: 'Преподаватель',
@@ -825,8 +1016,8 @@ const TeacherProfileView = ({ userName }: { userName: string }) => {
       experience: '15 лет',
       about:
         'Преподаватель с 15-летним стажем. Специализируюсь на разработке программного обеспечения и веб-технологиях. Активно занимаюсь научной работой в области искусственного интеллекта и машинного обучения.',
-      email: 'a.petrov@university.edu',
-      phone: '+7 (999) 888-77-66',
+      email: profileData?.data?.email || 'a.petrov@university.edu',
+      phone: profileData?.data?.phoneNumber || '+7 (999) 888-77-66',
       office: 'Главный корпус, кабинет 401',
       officeHours: 'Вторник, Четверг 14:00-16:00',
       faculty: 'Факультет информационных технологий',
@@ -858,11 +1049,17 @@ const TeacherProfileView = ({ userName }: { userName: string }) => {
       website: 'https://petrov.edu',
       linkedin: 'https://linkedin.com/in/petrov',
     }),
-    [userName]
+    [userName, apiName, profileData]
   );
 
   const [profile, setProfile] = useState<TeacherProfile>(initial);
   const [draft, setDraft] = useState<TeacherProfile>(initial);
+
+  useEffect(() => {
+    setProfile(initial);
+    setDraft(initial);
+  }, [initial]);
+
   const initials = useMemo(() => initialsFromName(profile.fullName), [profile.fullName]);
 
   const startEdit = () => {
@@ -871,7 +1068,7 @@ const TeacherProfileView = ({ userName }: { userName: string }) => {
     setIsEditing(true);
   };
 
-  const save = () => {
+  const save = async () => {
     const errors: string[] = [];
     if (!draft.fullName.trim()) errors.push('ФИО обязательно');
     if (!draft.email.trim()) errors.push('Email обязателен');
@@ -880,9 +1077,23 @@ const TeacherProfileView = ({ userName }: { userName: string }) => {
       setError(errors.join(' • '));
       return;
     }
-    setProfile(draft);
-    setIsEditing(false);
-    setError(null);
+    try {
+      const nameParts = draft.fullName.trim().split(/\s+/);
+      await updateProfileApi({
+        userId,
+        data: {
+          firstName: nameParts[0] || '',
+          lastName: nameParts[1] || '',
+          email: draft.email,
+          phoneNumber: draft.phone,
+        },
+      }).unwrap();
+      setProfile(draft);
+      setIsEditing(false);
+      setError(null);
+    } catch {
+      setError('Ошибка при сохранении профиля');
+    }
   };
 
   const addDiscipline = () => {
@@ -912,7 +1123,6 @@ const TeacherProfileView = ({ userName }: { userName: string }) => {
           <div className={styles.topActions}>
             <div className={styles.notif}>
               <img src={BellIcon} className={styles.notifIcon} />
-              <div className={styles.notifBadge}>7</div>
             </div>
             <div className={styles.avatarSmall}>{initials}</div>
           </div>
@@ -1168,11 +1378,16 @@ const TeacherProfileView = ({ userName }: { userName: string }) => {
 
 const ProfilePage = () => {
   const userName = useAppSelector((s) => s.auth.userName) || '';
+  const userId = useAppSelector((s) => s.auth.userId) || '';
   const userRole = useAppSelector((s) => s.auth.userRole) || 'Студент';
   const isTeacher = userRole === 'Преподаватель';
   const isHead = userRole === 'Заведующий кафедрой';
 
-  return isHead ? <HeadProfileView userName={userName} /> : isTeacher ? <TeacherProfileView userName={userName} /> : <StudentProfileView userName={userName} />;
+  return isHead
+    ? <HeadProfileView userName={userName} userId={userId} />
+    : isTeacher
+    ? <TeacherProfileView userName={userName} userId={userId} />
+    : <StudentProfileView userName={userName} userId={userId} />;
 };
 
 export default ProfilePage;

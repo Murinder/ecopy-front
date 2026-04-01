@@ -241,6 +241,21 @@
   line-height: 16px;
 }
 
+.metricBar {
+  margin-top: 12px;
+  height: 6px;
+  border-radius: 3px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.metricBarFill {
+  height: 100%;
+  border-radius: 3px;
+  background: #6366f1;
+  transition: width 0.4s ease;
+}
+
 .divider {
   margin: 12px 0;
   height: 6px;

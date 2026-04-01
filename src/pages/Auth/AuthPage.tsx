@@ -6,9 +6,26 @@ import CoursesIcon from '../../assets/icons/mjbmnzii-qcfmg4x.svg';
 import CertificatesIcon from '../../assets/icons/mjbmnzii-hptfss7.svg';
 import CommunityIcon from '../../assets/icons/mjbmnzii-ba5ispw.svg';
 import ScheduleIcon from '../../assets/icons/mjbmnzii-lc4urbp.svg';
-import { useLoginMutation, useRegisterMutation } from '../../services/coreApi';
+import { useLoginMutation, useRegisterMutation, useLazyGetProfileQuery } from '../../services/coreApi';
 import { useAppDispatch } from '../../app/hooks';
 import { setToken, setUserId, setUserName, setUserRole, setRememberMe } from '../../features/auth/authSlice';
+
+const backendRoleToUiRole: Record<string, string> = {
+  STUDENT: 'Студент',
+  LECTURER: 'Преподаватель',
+  DEPARTMENT_HEAD: 'Заведующий кафедрой',
+  PARTNER: 'Партнер',
+  ADMIN: 'Администратор',
+};
+
+const decodeJwt = (token: string): { userId: string; role: string; email: string } => {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return { userId: payload.sub || '', role: payload.role || '', email: payload.email || '' };
+  } catch {
+    return { userId: '', role: '', email: '' };
+  }
+};
 
 const AuthPage = () => {
   const [tab, setTab] = useState<'login' | 'register'>('login');
@@ -21,6 +38,7 @@ const AuthPage = () => {
 
   const [login, { isLoading: loginLoading }] = useLoginMutation();
   const [register, { isLoading: registerLoading }] = useRegisterMutation();
+  const [fetchProfile] = useLazyGetProfileQuery();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
 
@@ -28,51 +46,42 @@ const AuthPage = () => {
 
   const demoUsers: Record<
     DemoUserKey,
-    { label: string; email: string; password: string; userId: string; name: string; role: string }
+    { label: string; email: string; password: string }
   > = {
-    student: {
-      label: 'Студент',
-      email: 'student@university.edu',
-      password: 'student123',
-      userId: '00000000-0000-0000-0000-000000000001',
-      name: 'Иван Иванов',
-      role: 'Студент',
-    },
-    teacher: {
-      label: 'Преподаватель',
-      email: 'teacher@university.edu',
-      password: 'teacher123',
-      userId: '00000000-0000-0000-0000-000000000002',
-      name: 'Петр Петров',
-      role: 'Преподаватель',
-    },
-    head: {
-      label: 'Заведующий кафедрой',
-      email: 'head@university.edu',
-      password: 'head12345',
-      userId: '00000000-0000-0000-0000-000000000003',
-      name: 'Сергей Сергеев',
-      role: 'Заведующий кафедрой',
-    },
+    student: { label: 'Студент', email: 'student@university.edu', password: 'student123' },
+    teacher: { label: 'Преподаватель', email: 'teacher@university.edu', password: 'teacher123' },
+    head: { label: 'Заведующий кафедрой', email: 'head@university.edu', password: 'head12345' },
   };
 
-  const resolveDemoUser = (emailValue: string) => {
-    const normalized = emailValue.trim().toLowerCase();
-    return Object.values(demoUsers).find((u) => u.email.toLowerCase() === normalized);
+  const applyLoginToken = (tokenData: { accessToken: string; refreshToken: string; expiresIn: number; tokenType: string }) => {
+    dispatch(setToken(tokenData));
+    const jwt = decodeJwt(tokenData.accessToken);
+    dispatch(setUserId(jwt.userId));
+    dispatch(setUserRole(backendRoleToUiRole[jwt.role] || jwt.role || 'Студент'));
   };
 
-  const loginAsDemoUser = (key: DemoUserKey) => {
+  const loginAsDemoUser = async (key: DemoUserKey) => {
     const u = demoUsers[key];
     setTab('login');
     setEmail(u.email);
     setPassword(u.password);
     setErrorText(undefined);
-    dispatch(setToken(undefined));
-    dispatch(setUserId(u.userId));
-    dispatch(setUserName(u.name));
-    dispatch(setUserRole(u.role));
-    dispatch(setRememberMe(remember));
-    navigate('/projects');
+    try {
+      const res = await login({ email: u.email, password: u.password }).unwrap();
+      applyLoginToken(res.data);
+      const jwt = decodeJwt(res.data.accessToken);
+      try {
+        const profile = await fetchProfile(jwt.userId).unwrap();
+        const fullName = [profile.data.firstName, profile.data.lastName].filter(Boolean).join(' ');
+        dispatch(setUserName(fullName || jwt.email.split('@')[0]));
+      } catch {
+        dispatch(setUserName(jwt.email.split('@')[0]));
+      }
+      dispatch(setRememberMe(remember));
+      navigate('/projects');
+    } catch {
+      setErrorText('Не удалось войти. Проверьте доступность сервера.');
+    }
   };
 
   const onSubmit = async () => {
@@ -80,31 +89,34 @@ const AuthPage = () => {
     try {
       if (tab === 'login') {
         const res = await login({ email, password }).unwrap();
-        const demo = resolveDemoUser(email);
-        dispatch(setToken(res.data));
-        dispatch(setUserId(demo?.userId ?? '00000000-0000-0000-0000-000000000001'));
-        if (demo) {
-          dispatch(setUserName(demo.name));
-          dispatch(setUserRole(demo.role));
+        applyLoginToken(res.data);
+        const jwt = decodeJwt(res.data.accessToken);
+        try {
+          const profile = await fetchProfile(jwt.userId).unwrap();
+          const fullName = [profile.data.firstName, profile.data.lastName].filter(Boolean).join(' ');
+          dispatch(setUserName(fullName || jwt.email.split('@')[0]));
+        } catch {
+          dispatch(setUserName(jwt.email.split('@')[0]));
         }
         dispatch(setRememberMe(remember));
         navigate('/projects');
       } else {
-        const res = await register({ email, password, firstName, lastName }).unwrap();
-        dispatch(setUserId(res.data.id));
-        dispatch(setUserName(`${firstName} ${lastName}`.trim() || undefined));
-        dispatch(setUserRole('Студент'));
-        navigate('/projects');
+        const regRes = await register({ email, password, firstName, lastName }).unwrap();
+        dispatch(setUserId(regRes.data.id));
+        dispatch(setUserName(`${firstName} ${lastName}`.trim() || email));
+        dispatch(setUserRole(backendRoleToUiRole[regRes.data.role || ''] || 'Студент'));
+        // Auto-login after registration to get a token
+        try {
+          const loginRes = await login({ email, password }).unwrap();
+          applyLoginToken(loginRes.data);
+          navigate('/projects');
+        } catch {
+          setErrorText('Регистрация прошла успешно. Войдите с вашими данными.');
+        }
       }
-    } catch {
-      setErrorText('API недоступно. Данные сохранены локально для демо.');
-      const demo = resolveDemoUser(email);
-      dispatch(setUserId(demo?.userId ?? '00000000-0000-0000-0000-000000000001'));
-      if (demo) {
-        dispatch(setUserName(demo.name));
-        dispatch(setUserRole(demo.role));
-      }
-      navigate('/projects');
+    } catch (err: unknown) {
+      const msg = (err as { data?: { message?: string } })?.data?.message;
+      setErrorText(msg || 'Ошибка при подключении к серверу. Проверьте доступность API.');
     }
   };
 

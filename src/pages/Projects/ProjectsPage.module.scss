@@ -350,6 +350,17 @@
   font-size: 14px;
   font-weight: 500;
 }
+.tabInactive {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  padding: 3px 7px;
+  cursor: pointer;
+  height: 29px;
+  border-radius: 16px;
+}
 .button9 {
   display: flex;
   align-items: center;

@@ -9,6 +9,8 @@ import AwardIcon from '../../assets/icons/ui-award.svg';
 import PeopleIcon from '../../assets/icons/mjbmqg4r-g71l6vp.svg';
 import FileIcon from '../../assets/icons/ui-file.svg';
 import { useAppSelector } from '../../app/hooks';
+import { useGetTeachersQuery } from '../../services/coreApi';
+import type { UserProfileDto } from '../../services/coreApi';
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 const initialsFromName = (name: string) =>
@@ -44,181 +46,62 @@ type TeacherItem = {
 
 type SortKey = 'rating' | 'projects' | 'publications';
 
+const defaultActivity = [
+  { name: 'Сен', consultations: 0, projects: 0 },
+  { name: 'Окт', consultations: 0, projects: 0 },
+  { name: 'Ноя', consultations: 0, projects: 0 },
+  { name: 'Дек', consultations: 0, projects: 0 },
+  { name: 'Янв', consultations: 0, projects: 0 },
+  { name: 'Фев', consultations: 0, projects: 0 },
+];
+
+const defaultSuccess = [
+  { name: 'Отлично', value: 0 },
+  { name: 'Хорошо', value: 0 },
+  { name: 'Удовл.', value: 0 },
+];
+
+const mapProfileToTeacher = (p: UserProfileDto): TeacherItem => ({
+  id: p.id,
+  name: [p.lastName, p.firstName].filter(Boolean).join(' ') || p.email || 'Преподаватель',
+  title: 'Преподаватель',
+  rating: 0,
+  activeProjects: 0,
+  totalProjects: 0,
+  students: 0,
+  completion: 0,
+  avgGrade: 0,
+  publications: 0,
+  grants: 0,
+  hours: 0,
+  consultations: 0,
+  activity: defaultActivity,
+  success: defaultSuccess,
+  projectsStats: { active: 0, done: 0 },
+  studentsStats: { total: 0, active: 0 },
+  scienceStats: { publications: 0, grants: 0 },
+});
+
+
 const TeachersPage = () => {
   const userName = useAppSelector((s) => s.auth.userName) || 'Смирнов В.И.';
   const userRole = useAppSelector((s) => s.auth.userRole) || 'Студент';
   const initials = useMemo(() => initialsFromName(userName), [userName]);
   const isHead = userRole === 'Заведующий кафедрой';
 
+  const { data: teachersData, isLoading: teachersLoading, isError: teachersError } = useGetTeachersQuery();
+
   const [query, setQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortKey>('rating');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const teachers = useMemo<TeacherItem[]>(
-    () => [
-      {
-        id: 't1',
-        name: 'Иванова Мария Сергеевна',
-        title: 'Профессор',
-        rating: 4.9,
-        activeProjects: 10,
-        totalProjects: 45,
-        students: 38,
-        completion: 89,
-        avgGrade: 4.7,
-        publications: 18,
-        grants: 5,
-        hours: 142,
-        consultations: 52,
-        activity: [
-          { name: 'Сен', consultations: 34, projects: 8 },
-          { name: 'Окт', consultations: 41, projects: 10 },
-          { name: 'Ноя', consultations: 48, projects: 12 },
-          { name: 'Дек', consultations: 45, projects: 11 },
-          { name: 'Янв', consultations: 53, projects: 13 },
-          { name: 'Фев', consultations: 50, projects: 12 },
-        ],
-        success: [
-          { name: 'Отлично', value: 18 },
-          { name: 'Хорошо', value: 15 },
-          { name: 'Удовл.', value: 8 },
-          { name: 'Неуд.', value: 2 },
-        ],
-        projectsStats: { active: 10, done: 35 },
-        studentsStats: { total: 38, active: 36 },
-        scienceStats: { publications: 18, grants: 5 },
-      },
-      {
-        id: 't2',
-        name: 'Петров Александр Владимирович',
-        title: 'Доцент',
-        rating: 4.8,
-        activeProjects: 12,
-        totalProjects: 40,
-        students: 45,
-        completion: 92,
-        avgGrade: 4.6,
-        publications: 12,
-        grants: 3,
-        hours: 156,
-        consultations: 47,
-        activity: [
-          { name: 'Сен', consultations: 28, projects: 9 },
-          { name: 'Окт', consultations: 33, projects: 10 },
-          { name: 'Ноя', consultations: 39, projects: 11 },
-          { name: 'Дек', consultations: 36, projects: 10 },
-          { name: 'Янв', consultations: 44, projects: 12 },
-          { name: 'Фев', consultations: 46, projects: 12 },
-        ],
-        success: [
-          { name: 'Отлично', value: 22 },
-          { name: 'Хорошо', value: 16 },
-          { name: 'Удовл.', value: 6 },
-          { name: 'Неуд.', value: 1 },
-        ],
-        projectsStats: { active: 12, done: 28 },
-        studentsStats: { total: 45, active: 41 },
-        scienceStats: { publications: 12, grants: 3 },
-      },
-      {
-        id: 't3',
-        name: 'Козлов Дмитрий Александрович',
-        title: 'Доцент',
-        rating: 4.7,
-        activeProjects: 11,
-        totalProjects: 41,
-        students: 40,
-        completion: 90,
-        avgGrade: 4.6,
-        publications: 10,
-        grants: 2,
-        hours: 128,
-        consultations: 39,
-        activity: [
-          { name: 'Сен', consultations: 24, projects: 7 },
-          { name: 'Окт', consultations: 30, projects: 9 },
-          { name: 'Ноя', consultations: 35, projects: 9 },
-          { name: 'Дек', consultations: 33, projects: 10 },
-          { name: 'Янв', consultations: 38, projects: 11 },
-          { name: 'Фев', consultations: 40, projects: 10 },
-        ],
-        success: [
-          { name: 'Отлично', value: 16 },
-          { name: 'Хорошо', value: 18 },
-          { name: 'Удовл.', value: 8 },
-          { name: 'Неуд.', value: 3 },
-        ],
-        projectsStats: { active: 11, done: 30 },
-        studentsStats: { total: 40, active: 34 },
-        scienceStats: { publications: 10, grants: 2 },
-      },
-      {
-        id: 't4',
-        name: 'Сидоров Игорь Петрович',
-        title: 'Доцент',
-        rating: 4.6,
-        activeProjects: 9,
-        totalProjects: 34,
-        students: 35,
-        completion: 87,
-        avgGrade: 4.5,
-        publications: 8,
-        grants: 1,
-        hours: 116,
-        consultations: 33,
-        activity: [
-          { name: 'Сен', consultations: 20, projects: 6 },
-          { name: 'Окт', consultations: 27, projects: 8 },
-          { name: 'Ноя', consultations: 29, projects: 8 },
-          { name: 'Дек', consultations: 26, projects: 7 },
-          { name: 'Янв', consultations: 32, projects: 9 },
-          { name: 'Фев', consultations: 31, projects: 8 },
-        ],
-        success: [
-          { name: 'Отлично', value: 14 },
-          { name: 'Хорошо', value: 14 },
-          { name: 'Удовл.', value: 6 },
-          { name: 'Неуд.', value: 2 },
-        ],
-        projectsStats: { active: 9, done: 25 },
-        studentsStats: { total: 35, active: 31 },
-        scienceStats: { publications: 8, grants: 1 },
-      },
-      {
-        id: 't5',
-        name: 'Волкова Анна Дмитриевна',
-        title: 'Старший преподаватель',
-        rating: 4.5,
-        activeProjects: 8,
-        totalProjects: 30,
-        students: 32,
-        completion: 85,
-        avgGrade: 4.4,
-        publications: 6,
-        grants: 1,
-        hours: 104,
-        consultations: 29,
-        activity: [
-          { name: 'Сен', consultations: 18, projects: 5 },
-          { name: 'Окт', consultations: 22, projects: 7 },
-          { name: 'Ноя', consultations: 25, projects: 7 },
-          { name: 'Дек', consultations: 24, projects: 6 },
-          { name: 'Янв', consultations: 28, projects: 8 },
-          { name: 'Фев', consultations: 27, projects: 7 },
-        ],
-        success: [
-          { name: 'Отлично', value: 12 },
-          { name: 'Хорошо', value: 13 },
-          { name: 'Удовл.', value: 6 },
-          { name: 'Неуд.', value: 1 },
-        ],
-        projectsStats: { active: 8, done: 22 },
-        studentsStats: { total: 32, active: 28 },
-        scienceStats: { publications: 6, grants: 1 },
-      },
-    ],
-    []
-  );
+  const teachers = useMemo<TeacherItem[]>(() => {
+    const apiTeachers = teachersData?.data;
+    if (apiTeachers && apiTeachers.length > 0) {
+      return apiTeachers.map(mapProfileToTeacher);
+    }
+    return [];
+  }, [teachersData]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -268,7 +151,6 @@ const TeachersPage = () => {
           <div className={styles.topActions}>
             <div className={styles.notif}>
               <img src={BellIcon} className={styles.notifIcon} />
-              <div className={styles.notifBadge}>4</div>
             </div>
             <div className={styles.avatar}>{initials}</div>
           </div>
@@ -343,6 +225,11 @@ const TeachersPage = () => {
                 </div>
 
                 <div className={styles.list}>
+                  {teachersLoading && <p className={styles.loading}>Загрузка...</p>}
+                  {teachersError && <p className={styles.error}>Ошибка загрузки данных</p>}
+                  {!teachersLoading && !teachersError && filtered.length === 0 && (
+                    <p className={styles.empty}>Нет данных</p>
+                  )}
                   {filtered.map((t) => {
                     const initialsCard = initialsFromName(t.name);
                     return (
