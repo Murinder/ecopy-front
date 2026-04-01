@@ -42,7 +42,7 @@ export interface ApiResponse<T> {
 export const projectApi = createApi({
   reducerPath: 'projectApi',
   baseQuery: fetchBaseQuery({
-    baseUrl: 'http://localhost:8080',
+    baseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080',
     prepareHeaders: (headers, { getState }) => {
       const token = (getState() as RootState).auth.token?.accessToken;
       if (token) headers.set('Authorization', `Bearer ${token}`);

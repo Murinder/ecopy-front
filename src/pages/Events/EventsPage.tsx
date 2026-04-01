@@ -658,7 +658,8 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
     return map;
   }, [myApplications]);
 
-  const { data: eventTeamsData } = useGetEventTeamsQuery(teamModalEventId ?? '', { skip: !teamModalEventId });
+  const teamsEventId = teamModalEventId ?? selectedId ?? '';
+  const { data: eventTeamsData } = useGetEventTeamsQuery(teamsEventId, { skip: !teamsEventId });
   const eventTeams = useMemo(() => eventTeamsData ?? [], [eventTeamsData]);
 
   const upcoming = useMemo<EventItem[]>(() => {
