@@ -36,6 +36,9 @@ type EventItem = {
   participants: string;
   chips: string[];
   isRegistered?: boolean;
+  dateISO?: string;
+  endDateISO?: string;
+  organizerName?: string;
 };
 
 type TeacherEventType = 'Консультация' | 'Лекция' | 'Семинар' | 'Защита';
@@ -103,7 +106,10 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
   const userId = useAppSelector((s) => s.auth.userId);
   const { data: apiEvents, isLoading: eventsLoading, isError: eventsError } = useGetTeacherEventsQuery(userId ?? '', { skip: !userId });
 
-  const [teacherViewDate, setTeacherViewDate] = useState(() => new Date(2025, 10, 1));
+  const [teacherViewDate, setTeacherViewDate] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
   const [teacherSelectedId, setTeacherSelectedId] = useState<string | null>(null);
   const [teacherCreateOpen, setTeacherCreateOpen] = useState(false);
 
@@ -155,7 +161,7 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
   };
 
   const teacherWeekItems = useMemo(() => {
-    const now = new Date(2025, 10, 14, 12, 0, 0, 0);
+    const now = new Date();
     const to = new Date(now);
     to.setDate(now.getDate() + 7);
 
@@ -677,6 +683,9 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
           participants: e.participants,
           chips: e.chips,
           isRegistered: e.isRegistered,
+          dateISO: e.dateISO,
+          endDateISO: e.endDateISO,
+          organizerName: e.organizerName,
         }));
     }
     return [];
@@ -697,6 +706,9 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
           participants: e.participants,
           chips: e.chips,
           isRegistered: e.isRegistered,
+          dateISO: e.dateISO,
+          endDateISO: e.endDateISO,
+          organizerName: e.organizerName,
         }));
     }
     return [];
@@ -765,7 +777,13 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
 
   const downloadIcs = (event: EventItem) => {
     const now = new Date();
-    const safeTitle = event.title.replace(/[\\r\\n]+/g, ' ').trim();
+    const toIcsDate = (iso?: string) => {
+      if (!iso) return null;
+      return new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+    };
+    const dtStart = toIcsDate(event.dateISO) ?? now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+    const dtEnd = toIcsDate(event.endDateISO) ?? dtStart;
+    const safeTitle = event.title.replace(/[\r\n]+/g, ' ').trim();
     const content = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
@@ -773,13 +791,15 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
       'CALSCALE:GREGORIAN',
       'BEGIN:VEVENT',
       `UID:${event.id}@ecopu.local`,
-      `DTSTAMP:${now.toISOString().replace(/[-:]/g, '').replace(/\\.\\d{3}Z$/, 'Z')}`,
+      `DTSTAMP:${now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')}`,
+      `DTSTART:${dtStart}`,
+      `DTEND:${dtEnd}`,
       `SUMMARY:${safeTitle}`,
-      `DESCRIPTION:${event.description.replace(/[\\r\\n]+/g, ' ').trim()}`,
-      `LOCATION:${event.place.replace(/[\\r\\n]+/g, ' ').trim()}`,
+      `DESCRIPTION:${event.description.replace(/[\r\n]+/g, ' ').trim()}`,
+      `LOCATION:${event.place.replace(/[\r\n]+/g, ' ').trim()}`,
       'END:VEVENT',
       'END:VCALENDAR',
-    ].join('\\r\\n');
+    ].join('\r\n');
 
     const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -1026,11 +1046,17 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
               </div>
             </div>
 
-            <div className={styles.sectionLabel}>Организатор</div>
-            <div className={styles.organizerRow}>
-              <div className={styles.orgAvatar}>Ст</div>
-              <div className={styles.orgName}>Студенческий совет ИТ</div>
-            </div>
+            {selected.organizerName && (
+              <>
+                <div className={styles.sectionLabel}>Организатор</div>
+                <div className={styles.organizerRow}>
+                  <div className={styles.orgAvatar}>
+                    {selected.organizerName.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
+                  </div>
+                  <div className={styles.orgName}>{selected.organizerName}</div>
+                </div>
+              </>
+            )}
 
             <div className={styles.sectionLabel}>Теги</div>
             <div className={styles.tagsRow}>

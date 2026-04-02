@@ -12,6 +12,7 @@ import FileIcon from '../../assets/icons/ui-file.svg';
 import DownloadIcon from '../../assets/icons/ui-download.svg';
 import AwardIcon from '../../assets/icons/ui-award.svg';
 import Sidebar from '../../components/Sidebar';
+import NotificationBell from '../../components/NotificationPanel';
 import {
   useGetUserProjectsQuery,
   useCreateProjectMutation,
@@ -20,8 +21,26 @@ import {
   useChangeTaskStatusMutation,
   useUpdateTaskMutation,
   useGetProjectMembersQuery,
+  useAddProjectMemberMutation,
+  useRemoveProjectMemberMutation,
+  useGetProjectDocumentsQuery,
+  useUploadDocumentMutation,
+  useDeleteDocumentMutation,
 } from '../../services/projectApi';
 import type { TaskDto, ProjectDto } from '../../services/projectApi';
+import { useGetStudentsQuery, useGetTeachersQuery } from '../../services/coreApi';
+
+const STATUS_RU: Record<string, string> = {
+  ACTIVE: 'Активен', COMPLETED: 'Завершён', FROZEN: 'Заморожен', CANCELLED: 'Отменён',
+  TO_DO: 'К выполнению', IN_PROGRESS: 'В процессе', REVIEW: 'На проверке', DONE: 'Выполнено', BLOCKED: 'Заблокировано',
+};
+
+const formatProjectDate = (d?: string) => {
+  if (!d) return '—';
+  const [y, m, day] = d.split('-').map(Number);
+  if (!y || !m || !day) return d;
+  return new Date(y, m - 1, day).toLocaleDateString('ru-RU');
+};
 
 type TeacherTabKey = 'all' | 'active' | 'review' | 'done';
 
@@ -155,9 +174,20 @@ const ProjectsPage = () => {
     { skip: !teacherSelectedId }
   );
 
+  const isRealProjectId = selectedProjectId && !selectedProjectId.startsWith('demo-') && !selectedProjectId.startsWith('local-');
+  const { data: studentMembersResp, refetch: refetchMembers } = useGetProjectMembersQuery(selectedProjectId || '', { skip: !isRealProjectId });
+  const studentMembers = studentMembersResp?.data || [];
+  const [addMember] = useAddProjectMemberMutation();
+  const [removeMember] = useRemoveProjectMemberMutation();
+  const [addMemberEmail, setAddMemberEmail] = useState('');
+  const [addMemberError, setAddMemberError] = useState<string | null>(null);
+  const { data: allStudents } = useGetStudentsQuery();
+  const { data: allTeachers } = useGetTeachersQuery();
+  const allUsersForLookup = useMemo(() => [...(allStudents?.data ?? []), ...(allTeachers?.data ?? [])], [allStudents, allTeachers]);
+
   const { data: tasksResp, isLoading: tasksLoading, isError: tasksError } = useGetProjectTasksQuery(
     selectedProjectId || '',
-    { skip: !selectedProjectId }
+    { skip: !isRealProjectId }
   );
   const tasksServer = tasksResp?.data || [];
   const [fallbackTasks, setFallbackTasks] = useState<TaskDto[]>([]);
@@ -169,12 +199,13 @@ const ProjectsPage = () => {
     const g: Record<string, TaskDto[]> = {
       TO_DO: [],
       IN_PROGRESS: [],
+      REVIEW: [],
       DONE: [],
+      BLOCKED: [],
     };
     tasks.forEach((t) => {
-      if (t.status === 'TO_DO') g.TO_DO.push(t);
-      else if (t.status === 'IN_PROGRESS' || t.status === 'REVIEW') g.IN_PROGRESS.push(t);
-      else if (t.status === 'DONE') g.DONE.push(t);
+      if (g[t.status]) g[t.status].push(t);
+      else g.TO_DO.push(t);
     });
     return g;
   }, [tasks]);
@@ -191,6 +222,34 @@ const ProjectsPage = () => {
   const [createDescription, setCreateDescription] = useState('');
   const [createEndDate, setCreateEndDate] = useState('');
   const [creating, setCreating] = useState(false);
+
+  const { data: docsResp } = useGetProjectDocumentsQuery(selectedProjectId || '', { skip: !isRealProjectId });
+  const [uploadDocument] = useUploadDocumentMutation();
+  const [deleteDocument] = useDeleteDocumentMutation();
+  const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const docs = docsResp?.data || [];
+
+  const onFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedProjectId || !userId) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('projectId', selectedProjectId);
+    formData.append('userId', userId);
+    formData.append('description', file.name);
+    setUploading(true);
+    setUploadMsg(null);
+    try {
+      await uploadDocument(formData).unwrap();
+      setUploadMsg({ ok: true, text: `Файл "${file.name}" загружен` });
+    } catch {
+      setUploadMsg({ ok: false, text: 'Ошибка загрузки файла' });
+    }
+    setUploading(false);
+    e.target.value = '';
+    setTimeout(() => setUploadMsg(null), 4000);
+  };
 
   const openCreateProject = () => {
     setIsCreateOpen(true);
@@ -214,6 +273,10 @@ const ProjectsPage = () => {
     setCreating(true);
     try {
       const res = await createProject(body).unwrap();
+      // Auto-add creator as LEADER
+      try {
+        await addMember({ projectId: res.data.id, userId: userId, role: 'LEADER' }).unwrap();
+      } catch { /* may fail if backend auto-adds creator */ }
       await refetchProjects();
       setSelectedProjectId(res.data.id);
       closeCreateProject();
@@ -443,10 +506,7 @@ const ProjectsPage = () => {
             </div>
             <div className={styles.container6}>
               <div className={styles.button7}>
-                <img src={BellIcon} className={styles.icon3} />
-                <div className={styles.badge}>
-                  <p className={styles.a32}>3</p>
-                </div>
+                <NotificationBell iconSrc={BellIcon} />
               </div>
               <div className={styles.button8}>
                 <div className={styles.primitiveSpan2}>
@@ -671,11 +731,7 @@ const ProjectsPage = () => {
                             </div>
                             <div className={styles.modalGroupHalf}>
                               <p className={styles.a3pr}>Участники</p>
-                              <input
-                                className={styles.modalInput}
-                                placeholder="Добавить участников"
-                                disabled
-                              />
+                              <p style={{ fontSize: 13, color: '#94a3b8', margin: '8px 0 0' }}>Добавить участников можно после создания проекта</p>
                             </div>
                           </div>
                           <div className={styles.modalActions}>
@@ -732,6 +788,20 @@ const ProjectsPage = () => {
                           onEditTitleCancel={onEditTitleCancel}
                         />
                         <KanbanColumn
+                          title="На проверке"
+                          count={grouped.REVIEW.length}
+                          tasks={grouped.REVIEW}
+                          onAddTask={() => onAddTask('REVIEW')}
+                          onDragStart={onDragStartTask}
+                          onDrop={() => onDropToColumn('REVIEW')}
+                          editingTaskId={editingTaskId}
+                          editingTitle={editingTitle}
+                          onEditTitleStart={onEditTitleStart}
+                          onEditTitleChange={onEditTitleChange}
+                          onEditTitleCommit={onEditTitleCommit}
+                          onEditTitleCancel={onEditTitleCancel}
+                        />
+                        <KanbanColumn
                           title="Выполнено"
                           count={grouped.DONE.length}
                           tasks={grouped.DONE}
@@ -745,9 +815,126 @@ const ProjectsPage = () => {
                           onEditTitleCommit={onEditTitleCommit}
                           onEditTitleCancel={onEditTitleCancel}
                         />
+                        <KanbanColumn
+                          title="Заблокировано"
+                          count={grouped.BLOCKED.length}
+                          tasks={grouped.BLOCKED}
+                          onAddTask={() => onAddTask('BLOCKED')}
+                          onDragStart={onDragStartTask}
+                          onDrop={() => onDropToColumn('BLOCKED')}
+                          editingTaskId={editingTaskId}
+                          editingTitle={editingTitle}
+                          onEditTitleStart={onEditTitleStart}
+                          onEditTitleChange={onEditTitleChange}
+                          onEditTitleCommit={onEditTitleCommit}
+                          onEditTitleCancel={onEditTitleCancel}
+                        />
                       </div>
                       {tasksLoading && <div style={{ padding: 12 }}>Загрузка задач...</div>}
                       {tasksError && <div style={{ padding: 12 }}>API недоступно — режим офлайн.</div>}
+
+                      {isRealProjectId && (
+                        <div style={{ marginTop: 20, padding: '16px 0', borderTop: '1px solid #f1f5f9' }}>
+                          <p className={styles.a19} style={{ marginBottom: 10 }}>Участники проекта ({studentMembers.length})</p>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                            {studentMembers.map((m) => {
+                              const name = m.userName || m.userId.slice(0, 8) + '...';
+                              const roleLabel = m.role === 'LEADER' ? 'Руководитель' : m.role === 'MENTOR' ? 'Наставник' : m.role === 'OBSERVER' ? 'Наблюдатель' : 'Участник';
+                              const isMe = m.userId === userId;
+                              return (
+                                <div key={m.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: isMe ? '#eff6ff' : '#f8fafc', borderRadius: 8, fontSize: 13 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span style={{ fontWeight: 600, color: '#0e1d45' }}>{name}{isMe ? ' (Вы)' : ''}</span>
+                                    <span style={{ fontSize: 11, color: '#64748b', padding: '2px 6px', background: '#e2e8f0', borderRadius: 4 }}>{roleLabel}</span>
+                                  </div>
+                                  {m.role !== 'LEADER' && m.userId !== userId && (
+                                    <button
+                                      style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 16, padding: '0 4px' }}
+                                      title="Удалить участника"
+                                      onClick={async () => { try { await removeMember({ projectId: selectedProjectId!, userId: m.userId }).unwrap(); refetchMembers(); } catch {} }}
+                                    >×</button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <input
+                              style={{ flex: 1, padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13 }}
+                              placeholder="Email участника"
+                              value={addMemberEmail}
+                              onChange={(e) => { setAddMemberEmail(e.target.value); setAddMemberError(null); }}
+                            />
+                            <button
+                              style={{ padding: '8px 16px', background: '#3a76f0', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                              onClick={async () => {
+                                if (!addMemberEmail.trim() || !selectedProjectId) return;
+                                setAddMemberError(null);
+                                // Find user by email from loaded users
+                                const found = allUsersForLookup.find(u => u.email === addMemberEmail.trim());
+                                if (!found) { setAddMemberError('Пользователь не найден'); return; }
+                                if (studentMembers.some(m => m.userId === found.id)) { setAddMemberError('Уже участник'); return; }
+                                try {
+                                  await addMember({ projectId: selectedProjectId, userId: found.id, role: 'MEMBER' }).unwrap();
+                                  refetchMembers();
+                                  setAddMemberEmail('');
+                                } catch { setAddMemberError('Ошибка при добавлении'); }
+                              }}
+                            >+ Добавить</button>
+                          </div>
+                          {addMemberError && <p style={{ color: '#dc2626', fontSize: 12, marginTop: 4 }}>{addMemberError}</p>}
+                        </div>
+                      )}
+
+                      {isRealProjectId && (
+                        <div style={{ marginTop: 20, padding: '16px 0', borderTop: '1px solid #f1f5f9' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                            <p className={styles.a19}>Документы проекта</p>
+                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: '#3a76f0', fontSize: 14, fontWeight: 500 }}>
+                              <img src={AddIcon} style={{ width: 16, height: 16 }} />
+                              {uploading ? 'Загрузка...' : 'Загрузить файл'}
+                              <input type="file" style={{ display: 'none' }} onChange={onFileUpload} disabled={uploading} />
+                            </label>
+                          </div>
+                          {uploadMsg && (
+                            <div style={{ padding: '8px 12px', marginBottom: 8, borderRadius: 8, fontSize: 13, background: uploadMsg.ok ? '#f0fdf4' : '#fef2f2', color: uploadMsg.ok ? '#16a34a' : '#dc2626' }}>
+                              {uploadMsg.text}
+                            </div>
+                          )}
+                          {docs.length === 0 ? (
+                            <p style={{ color: '#94a3b8', fontSize: 14 }}>Нет документов</p>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              {docs.map((d) => (
+                                <div key={d.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#f8fafc', borderRadius: 8 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <img src={FileIcon} style={{ width: 18, height: 18 }} />
+                                    <div>
+                                      <div style={{ fontSize: 14, fontWeight: 500, color: '#0e1d45' }}>{d.filePath?.split('/').pop()?.replace(/^[a-f0-9-]+_/, '') || d.description || 'Документ'}</div>
+                                      {d.description && <div style={{ fontSize: 12, color: '#94a3b8' }}>{d.description}</div>}
+                                    </div>
+                                  </div>
+                                  <div style={{ display: 'flex', gap: 8 }}>
+                                    <a
+                                      href={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/v1/documents/download/${d.id}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={{ cursor: 'pointer' }}
+                                    >
+                                      <img src={DownloadIcon} style={{ width: 18, height: 18 }} />
+                                    </a>
+                                    <img
+                                      src={CloseIcon}
+                                      style={{ width: 18, height: 18, cursor: 'pointer', opacity: 0.5 }}
+                                      onClick={() => deleteDocument(d.id)}
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className={styles.card7}>
@@ -1142,6 +1329,10 @@ const TeacherProjectModal = ({
 };
 
 const ProjectCard = ({ project, onSelect }: { project: ProjectDto; onSelect: () => void }) => {
+  const isReal = project.id && !project.id.startsWith('demo-') && !project.id.startsWith('local-');
+  const { data: membersResp } = useGetProjectMembersQuery(project.id, { skip: !isReal });
+  const memberCount = membersResp?.data?.length ?? 0;
+
   return (
     <div className={styles.card}>
       <div className={styles.projectsPage}>
@@ -1166,7 +1357,7 @@ const ProjectCard = ({ project, onSelect }: { project: ProjectDto; onSelect: () 
               <p className={styles.a17}>Статус</p>
             </div>
             <div className={styles.text11}>
-              <p className={styles.a65}>{project.status}</p>
+              <p className={styles.a65}>{STATUS_RU[project.status || ''] || project.status}</p>
             </div>
           </div>
           <div className={styles.primitiveDiv2}>
@@ -1177,13 +1368,13 @@ const ProjectCard = ({ project, onSelect }: { project: ProjectDto; onSelect: () 
           <div className={styles.container13}>
             <img src={PeopleIcon} className={styles.icon6} />
             <div className={styles.text12}>
-              <p className={styles.a17}>3</p>
+              <p className={styles.a17}>{memberCount}</p>
             </div>
           </div>
           <div className={styles.container14}>
             <img src={CalendarIcon} className={styles.icon7} />
             <div className={styles.text13}>
-              <p className={styles.a17}>{project.endDate || '-'}</p>
+              <p className={styles.a17}>{formatProjectDate(project.endDate)}</p>
             </div>
           </div>
           <button className={styles.primitiveButton} onClick={onSelect}>
@@ -1276,7 +1467,7 @@ const KanbanColumn = ({
                 </div>
               </div>
               <div className={styles.badge3}>
-                <p className={styles.a32}>{t.status}</p>
+                <p className={styles.a32}>{STATUS_RU[t.status] || t.status}</p>
               </div>
             </div>
           </div>

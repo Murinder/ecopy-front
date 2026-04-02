@@ -11,6 +11,7 @@ export interface ApiResponse<T> {
 
 export interface StudentRatingDto {
   userId: string;
+  userName: string | null;
   totalScore: number;
   calculationDetails: string;
   updatedAt: string;
@@ -43,6 +44,29 @@ export interface RatingHistoryDto {
   semester: number;
 }
 
+export interface RatingComparisonDto {
+  userId: string;
+  userName: string | null;
+  userAcademic: number;
+  userActivity: number;
+  userCommunication: number;
+  userTotal: number;
+  avgAcademic: number;
+  avgActivity: number;
+  avgCommunication: number;
+  avgTotal: number;
+}
+
+export interface RatingAchievementDto {
+  id: string;
+  title: string;
+  description: string;
+  score: number;
+  category: string;
+  earnedAt: string | null;
+  relatedEntityId: string | null;
+}
+
 export const ratingApi = createApi({
   reducerPath: 'ratingApi',
   baseQuery: fetchBaseQuery({
@@ -73,6 +97,14 @@ export const ratingApi = createApi({
       query: (userId) => ({ url: `/api/v1/ratings/students/${userId}/breakdown` }),
       providesTags: ['Ratings'],
     }),
+    getComparison: builder.query<ApiResponse<RatingComparisonDto>, string>({
+      query: (userId) => ({ url: `/api/v1/ratings/students/${userId}/comparison` }),
+      providesTags: ['Ratings'],
+    }),
+    getAchievements: builder.query<ApiResponse<RatingAchievementDto[]>, string>({
+      query: (userId) => ({ url: `/api/v1/ratings/students/${userId}/achievements` }),
+      providesTags: ['Ratings'],
+    }),
   }),
 });
 
@@ -81,4 +113,6 @@ export const {
   useGetTopStudentsQuery,
   useGetRatingDetailsQuery,
   useGetRatingBreakdownQuery,
+  useGetComparisonQuery,
+  useGetAchievementsQuery,
 } = ratingApi;

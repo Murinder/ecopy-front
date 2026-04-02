@@ -107,7 +107,10 @@ const ReportsPage = () => {
     const total = reports.length;
     const done = reports.filter((r) => r.status === 'DONE').length;
     const draft = reports.filter((r) => r.status === 'DRAFT').length;
-    const month = reports.filter((r) => r.date.endsWith('.11.2025')).length;
+    const now = new Date();
+    const mmNow = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyyNow = String(now.getFullYear());
+    const month = reports.filter((r) => r.date.endsWith(`.${mmNow}.${yyyyNow}`)).length;
     return { total, done, draft, month };
   }, [reports]);
 

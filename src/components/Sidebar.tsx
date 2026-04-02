@@ -51,7 +51,7 @@ const navForRole = (role: string): { portalSubtitle: string; items: NavItem[] } 
       portalSubtitle: 'Преподавательский портал',
       items: [
         { key: 'projects', label: 'Курируемые проекты', icon: ProjectsIcon, path: '/projects' },
-        { key: 'requests', label: 'Заявки студентов', icon: FileIcon, path: '/applications', badgeCount: 5 },
+        { key: 'requests', label: 'Заявки студентов', icon: FileIcon, path: '/applications' },
         { key: 'events', label: 'Календарь мероприятий', icon: CalendarIcon, path: '/events' },
         { key: 'schedule', label: 'Расписание', icon: ScheduleIcon, path: '/schedule' },
         { key: 'reports', label: 'Отчеты', icon: ReportsIcon, path: '/reports' },
@@ -68,7 +68,6 @@ const navForRole = (role: string): { portalSubtitle: string; items: NavItem[] } 
       { key: 'activity', label: 'Активность', icon: ActivityIcon, path: '/activity' },
       { key: 'events', label: 'Мероприятия', icon: EventsIcon, path: '/events' },
       { key: 'rating', label: 'Мой рейтинг', icon: RatingIcon, path: '/rating' },
-      { key: 'reports', label: 'Отчеты', icon: ReportsIcon, path: '/reports' },
       { key: 'profile', label: 'Личный кабинет', icon: AccountIcon, path: '/profile' },
     ],
   };

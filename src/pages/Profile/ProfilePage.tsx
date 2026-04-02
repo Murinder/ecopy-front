@@ -28,7 +28,10 @@ import {
   useGetUserLanguagesQuery,
   useCreateUserLanguageMutation,
   useDeleteUserLanguageMutation,
+  useGetFacultyQuery,
+  useGetDepartmentQuery,
 } from '../../services/coreApi';
+import { useGetRatingBreakdownQuery } from '../../services/ratingApi';
 
 const initialsFromName = (name: string) =>
   name
@@ -126,13 +129,29 @@ type HeadProfile = {
   admin: { teachers: number; students: number; yearsLeading: number };
 };
 
+const formatBirthDate = (dateStr: string): string => {
+  if (!dateStr) return '—';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return dateStr;
+  return new Date(y, m - 1, d).toLocaleDateString('ru-RU');
+};
+
 const StudentProfileView = ({ userName, userId }: { userName: string; userId: string }) => {
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { data: profileData, isLoading, isError } = useGetProfileQuery(userId, { skip: !userId });
+  const { data: profileData, isLoading, isError, refetch: refetchProfile } = useGetProfileQuery(userId, { skip: !userId });
   const { data: linksData } = useGetUserLinksQuery(userId, { skip: !userId });
   const { data: skillsData } = useGetUserSkillsQuery(userId, { skip: !userId });
   const { data: languagesData } = useGetUserLanguagesQuery(userId, { skip: !userId });
+
+  const facultyId = profileData?.data?.facultyId;
+  const departmentId = profileData?.data?.departmentId;
+  const { data: facultyData } = useGetFacultyQuery(facultyId ?? '', { skip: !facultyId });
+  const { data: departmentData } = useGetDepartmentQuery(departmentId ?? '', { skip: !departmentId });
+  const { data: ratingResp } = useGetRatingBreakdownQuery(userId, { skip: !userId });
+  const ratingBreakdown = ratingResp?.data;
+
   const [updateProfileApi] = useUpdateProfileMutation();
   const [createUserLink] = useCreateUserLinkMutation();
   const [updateUserLink] = useUpdateUserLinkMutation();
@@ -149,6 +168,8 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
     const portfolio = linksData?.find(l => l.linkType === 'PORTFOLIO')?.url ?? '';
     const skills = skillsData?.map(s => s.skillName) ?? [];
     const languages = languagesData?.map(l => l.language) ?? [];
+    const resolvedFaculty = facultyData?.name ?? '';
+    const resolvedDepartment = departmentData?.name ?? '';
     if (d) {
       return {
         fullName: [d.firstName, d.lastName].filter(Boolean).join(' ') || userName || '',
@@ -157,7 +178,7 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
         group: d.groupName ? `Группа ${d.groupName}` : '',
         role: 'Студент',
         studentId: d.id || '',
-        form: 'Очная',
+        form: d.studyForm || 'Очная',
         about: d.bio || '',
         email: d.email || '',
         phone: d.phoneNumber || '',
@@ -166,26 +187,26 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
         github,
         linkedin,
         portfolio,
-        faculty: '',
-        department: '',
+        faculty: resolvedFaculty,
+        department: resolvedDepartment,
         direction: d.studyProgram || '',
         admissionYear: d.enrollmentYear ? String(d.enrollmentYear) : '',
-        emergencyName: '',
-        emergencyPhone: '',
+        emergencyName: d.emergencyContactName || '',
+        emergencyPhone: d.emergencyContactPhone || '',
         skills,
         languages,
-        interests: [],
+        interests: d.interests ? d.interests.split(',').map(s => s.trim()).filter(Boolean) : [],
       };
     }
     return {
       fullName: userName || '',
       track: '', course: '', group: '', role: 'Студент', studentId: '', form: 'Очная',
       about: '', email: '', phone: '', address: '', birthDate: '',
-      github, linkedin, portfolio, faculty: '', department: '',
+      github, linkedin, portfolio, faculty: resolvedFaculty, department: resolvedDepartment,
       direction: '', admissionYear: '', emergencyName: '', emergencyPhone: '',
       skills, languages, interests: [],
     };
-  }, [profileData, linksData, skillsData, languagesData, userName]);
+  }, [profileData, linksData, skillsData, languagesData, userName, facultyData, departmentData]);
 
   const [profile, setProfile] = useState<Profile>(initial);
   const [draft, setDraft] = useState<Profile>(initial);
@@ -214,16 +235,22 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
     }
     try {
       const nameParts = draft.fullName.trim().split(/\s+/);
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
       await updateProfileApi({
         userId,
         data: {
-          firstName: nameParts[0] || '',
-          lastName: nameParts[1] || '',
+          firstName,
+          lastName,
           email: draft.email,
           phoneNumber: draft.phone,
           address: draft.address,
           bio: draft.about,
           birthDate: draft.birthDate || undefined,
+          emergencyContactName: draft.emergencyName || undefined,
+          emergencyContactPhone: draft.emergencyPhone || undefined,
+          interests: draft.interests.length ? draft.interests.join(',') : undefined,
+          studyForm: draft.form || undefined,
         },
       }).unwrap();
 
@@ -261,7 +288,7 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
 
       await Promise.all([...linkOps, ...skillOps, ...langOps]);
 
-      setProfile(draft);
+      await refetchProfile();
       setIsEditing(false);
       setError(null);
     } catch {
@@ -409,7 +436,7 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
                     <input className={styles.input} type="date" value={draft.birthDate} onChange={(e) => setDraft((p) => ({ ...p, birthDate: e.target.value }))} />
                   ) : (
                     <div className={styles.kvValue}>
-                      {profile.birthDate ? new Date(profile.birthDate).toLocaleDateString('ru-RU') : '—'}
+                      {formatBirthDate(profile.birthDate)}
                     </div>
                   )}
                 </div>
@@ -426,10 +453,12 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
                   </div>
                   {isEditing ? (
                     <input className={styles.input} value={draft.github} onChange={(e) => setDraft((p) => ({ ...p, github: e.target.value }))} />
-                  ) : (
+                  ) : profile.github ? (
                     <a className={styles.linkValue} href={profile.github} target="_blank" rel="noreferrer">
                       {profile.github}
                     </a>
+                  ) : (
+                    <div className={styles.kvValue}>—</div>
                   )}
                 </div>
                 <div className={styles.kvItem} style={{ gridColumn: '1 / -1' }}>
@@ -439,10 +468,12 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
                   </div>
                   {isEditing ? (
                     <input className={styles.input} value={draft.linkedin} onChange={(e) => setDraft((p) => ({ ...p, linkedin: e.target.value }))} />
-                  ) : (
+                  ) : profile.linkedin ? (
                     <a className={styles.linkValue} href={profile.linkedin} target="_blank" rel="noreferrer">
                       {profile.linkedin}
                     </a>
+                  ) : (
+                    <div className={styles.kvValue}>—</div>
                   )}
                 </div>
                 <div className={styles.kvItem} style={{ gridColumn: '1 / -1' }}>
@@ -452,10 +483,12 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
                   </div>
                   {isEditing ? (
                     <input className={styles.input} value={draft.portfolio} onChange={(e) => setDraft((p) => ({ ...p, portfolio: e.target.value }))} />
-                  ) : (
+                  ) : profile.portfolio ? (
                     <a className={styles.linkValue} href={profile.portfolio} target="_blank" rel="noreferrer">
                       {profile.portfolio}
                     </a>
+                  ) : (
+                    <div className={styles.kvValue}>—</div>
                   )}
                 </div>
               </div>
@@ -485,20 +518,20 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
               <div className={styles.cardTitle} style={{ marginTop: 14 }}>Успеваемость</div>
               <div className={styles.progressRow}>
                 <div className={styles.mini}>
-                  <div className={styles.miniValue} style={{ color: '#3a76f0' }}>—</div>
-                  <div className={styles.miniLabel}>Средний балл</div>
+                  <div className={styles.miniValue} style={{ color: '#3a76f0' }}>{ratingBreakdown?.totalScore != null ? ratingBreakdown.totalScore : '—'}</div>
+                  <div className={styles.miniLabel}>Общий балл</div>
                 </div>
                 <div className={styles.mini}>
-                  <div className={styles.miniValue} style={{ color: '#16a34a' }}>—</div>
-                  <div className={styles.miniLabel}>Кредитов</div>
+                  <div className={styles.miniValue} style={{ color: '#16a34a' }}>{ratingBreakdown?.academicScore != null ? ratingBreakdown.academicScore : '—'}</div>
+                  <div className={styles.miniLabel}>Академический</div>
                 </div>
                 <div className={styles.mini}>
                   <div className={styles.miniValue} style={{ color: '#8b5cf6' }}>{profile.course || '—'}</div>
                   <div className={styles.miniLabel}>Семестр</div>
                 </div>
                 <div className={styles.mini}>
-                  <div className={styles.miniValue} style={{ color: '#f97316' }}>—</div>
-                  <div className={styles.miniLabel}>Прогресс</div>
+                  <div className={styles.miniValue} style={{ color: '#f97316' }}>{ratingBreakdown?.monthGrowth != null ? `+${ratingBreakdown.monthGrowth}` : '—'}</div>
+                  <div className={styles.miniLabel}>Рост за месяц</div>
                 </div>
               </div>
             </div>
@@ -526,17 +559,36 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
 
               <div className={styles.cardTitle} style={{ marginTop: 14 }}>Быстрые действия</div>
               <div className={styles.actionsList}>
-                <button className={styles.actionBtn}>
+                <button className={styles.actionBtn} onClick={async () => {
+                  try {
+                    const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+                    const authStr = localStorage.getItem('auth');
+                    const token = authStr ? JSON.parse(authStr)?.token?.accessToken : null;
+                    const res = await fetch(`${base}/api/v1/calendar/export.ics`, {
+                      headers: token ? { Authorization: `Bearer ${token}` } : {},
+                    });
+                    if (!res.ok) throw new Error('Ошибка загрузки');
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'schedule.ics';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch {
+                    alert('Не удалось скачать расписание');
+                  }
+                }}>
                   <img src={CalendarIcon} className={styles.actionIcon} />
-                  Расписание занятий
+                  Скачать расписание (.ics)
                 </button>
-                <button className={styles.actionBtn}>
+                <button className={styles.actionBtn} onClick={() => navigate('/events')}>
                   <img src={CalendarIcon} className={styles.actionIcon} />
-                  Календарь сессий
+                  Мероприятия
                 </button>
-                <button className={styles.actionBtn}>
-                  <img src={MailIcon} className={styles.actionIcon} />
-                  Справка студента
+                <button className={styles.actionBtn} onClick={() => navigate('/projects')}>
+                  <img src={FileIcon} className={styles.actionIcon} />
+                  Мои документы
                 </button>
               </div>
             </div>
@@ -547,50 +599,55 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
                 <div>
                   <div className={styles.kvLabel}>Технические навыки</div>
                   <div className={styles.chips}>
-                    {(isEditing ? draft.skills : profile.skills).map((s) => (
-                      <span key={s} className={styles.chip}>
-                        {s}
-                        {isEditing && (
-                          <span
-                            onClick={() => removeSkill(s)}
-                            role="button"
-                            tabIndex={0}
-                            style={{ marginLeft: 6, cursor: 'pointer', opacity: 0.6 }}
-                          >
-                            ×
+                    {isEditing ? (
+                      <>
+                        {draft.skills.map((s) => (
+                          <span key={s} className={styles.chip}>
+                            {s}
+                            <span onClick={() => removeSkill(s)} role="button" tabIndex={0} style={{ marginLeft: 6, cursor: 'pointer', opacity: 0.6 }}>×</span>
                           </span>
-                        )}
-                      </span>
-                    ))}
-                    {isEditing && (
-                      <span className={`${styles.chip} ${styles.addChip}`} onClick={addSkill} role="button" tabIndex={0}>
-                        + Добавить
-                      </span>
+                        ))}
+                        <span className={`${styles.chip} ${styles.addChip}`} onClick={addSkill} role="button" tabIndex={0}>+ Добавить</span>
+                      </>
+                    ) : (
+                      <>
+                        {(skillsData ?? []).map((s) => (
+                          <span key={s.skillName} className={styles.chip} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            {s.skillName}
+                            <span style={{ fontSize: 11, opacity: 0.6 }}>Lv{s.level}</span>
+                            {s.verified && <span style={{ color: '#16a34a', fontSize: 12 }} title="Подтверждено">✓</span>}
+                          </span>
+                        ))}
+                        {(skillsData ?? []).length === 0 && <span style={{ color: '#94a3b8', fontSize: 14 }}>—</span>}
+                      </>
                     )}
                   </div>
                 </div>
                 <div>
                   <div className={styles.kvLabel}>Языки</div>
                   <div className={styles.chips}>
-                    {(isEditing ? draft.languages : profile.languages).map((l) => (
-                      <span key={l} className={styles.chip}>
-                        {l}
-                        {isEditing && (
-                          <span
-                            onClick={() => setDraft((p) => ({ ...p, languages: p.languages.filter(x => x !== l) }))}
-                            role="button"
-                            tabIndex={0}
-                            style={{ marginLeft: 6, cursor: 'pointer', opacity: 0.6 }}
-                          >
-                            ×
+                    {isEditing ? (
+                      <>
+                        {draft.languages.map((l) => (
+                          <span key={l} className={styles.chip}>
+                            {l}
+                            <span onClick={() => setDraft((p) => ({ ...p, languages: p.languages.filter(x => x !== l) }))} role="button" tabIndex={0} style={{ marginLeft: 6, cursor: 'pointer', opacity: 0.6 }}>×</span>
                           </span>
-                        )}
-                      </span>
-                    ))}
-                    {isEditing && (
-                      <span className={`${styles.chip} ${styles.addChip}`} onClick={addLanguage} role="button" tabIndex={0}>
-                        + Добавить
-                      </span>
+                        ))}
+                        <span className={`${styles.chip} ${styles.addChip}`} onClick={addLanguage} role="button" tabIndex={0}>+ Добавить</span>
+                      </>
+                    ) : (
+                      <>
+                        {(languagesData ?? []).map((l) => (
+                          <span key={l.language} className={styles.chip}>
+                            {l.language}
+                            <span style={{ fontSize: 11, opacity: 0.6, marginLeft: 4 }}>
+                              {l.proficiency === 'NATIVE' ? 'Родной' : l.proficiency === 'ADVANCED' ? 'Продвинутый' : l.proficiency === 'INTERMEDIATE' ? 'Средний' : l.proficiency === 'BEGINNER' ? 'Начальный' : l.proficiency}
+                            </span>
+                          </span>
+                        ))}
+                        {(languagesData ?? []).length === 0 && <span style={{ color: '#94a3b8', fontSize: 14 }}>—</span>}
+                      </>
                     )}
                   </div>
                 </div>
@@ -600,8 +657,15 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
                     {(isEditing ? draft.interests : profile.interests).map((i) => (
                       <span key={i} className={styles.chip}>
                         {i}
+                        {isEditing && (
+                          <span onClick={() => setDraft((p) => ({ ...p, interests: p.interests.filter(x => x !== i) }))} role="button" tabIndex={0} style={{ marginLeft: 6, cursor: 'pointer', opacity: 0.6 }}>×</span>
+                        )}
                       </span>
                     ))}
+                    {isEditing && (
+                      <span className={`${styles.chip} ${styles.addChip}`} onClick={() => { const v = window.prompt('Введите интерес'); if (v) setDraft((p) => ({ ...p, interests: [...p.interests, v.trim()] })); }} role="button" tabIndex={0}>+ Добавить</span>
+                    )}
+                    {!isEditing && profile.interests.length === 0 && <span style={{ color: '#94a3b8', fontSize: 14 }}>—</span>}
                   </div>
                 </div>
               </div>
@@ -712,7 +776,6 @@ const HeadProfileView = ({ userName, userId }: { userName: string; userId: strin
     }
   };
 
-  const openDemo = (label: string) => window.alert(`${label} (демо)`);
 
   return (
     <div className={styles.page}>
@@ -974,9 +1037,9 @@ const HeadProfileView = ({ userName, userId }: { userName: string; userId: strin
               <div className={styles.card}>
                 <div className={styles.cardTitle}>Быстрые действия</div>
                 <div className={styles.actionsList}>
-                  <button type="button" className={styles.actionBtn} onClick={() => openDemo('Список публикаций')}>
+                  <button type="button" className={styles.actionBtn} onClick={() => navigate('/activity')}>
                     <img src={AwardIcon} className={styles.actionIcon} />
-                    Список публикаций
+                    Аналитика кафедры
                   </button>
                   <button type="button" className={styles.actionBtn} onClick={() => navigate('/teachers')}>
                     <img src={PeopleIcon} className={styles.actionIcon} />
@@ -997,6 +1060,7 @@ const HeadProfileView = ({ userName, userId }: { userName: string; userId: strin
 };
 
 const TeacherProfileView = ({ userName, userId }: { userName: string; userId: string }) => {
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { data: profileData } = useGetProfileQuery(userId, { skip: !userId });
@@ -1108,7 +1172,6 @@ const TeacherProfileView = ({ userName, userId }: { userName: string; userId: st
     setDraft((p) => ({ ...p, interests: [...p.interests, name.trim()].filter(Boolean) }));
   };
 
-  const openDemo = (label: string) => window.alert(`${label} (демо)`);
 
   return (
     <div className={styles.page}>
@@ -1354,17 +1417,17 @@ const TeacherProfileView = ({ userName, userId }: { userName: string; userId: st
               <div className={styles.card}>
                 <div className={styles.cardTitle}>Быстрые действия</div>
                 <div className={styles.actionsList}>
-                  <button type="button" className={styles.actionBtn} onClick={() => openDemo('Мое расписание')}>
+                  <button type="button" className={styles.actionBtn} onClick={() => navigate('/schedule')}>
                     <img src={CalendarIcon} className={styles.actionIcon} />
                     Мое расписание
                   </button>
-                  <button type="button" className={styles.actionBtn} onClick={() => openDemo('Список студентов')}>
+                  <button type="button" className={styles.actionBtn} onClick={() => navigate('/applications')}>
                     <img src={PeopleIcon} className={styles.actionIcon} />
-                    Список студентов
+                    Заявки студентов
                   </button>
-                  <button type="button" className={styles.actionBtn} onClick={() => openDemo('Научные публикации')}>
-                    <img src={AwardIcon} className={styles.actionIcon} />
-                    Научные публикации
+                  <button type="button" className={styles.actionBtn} onClick={() => navigate('/reports')}>
+                    <img src={FileIcon} className={styles.actionIcon} />
+                    Мои отчеты
                   </button>
                 </div>
               </div>

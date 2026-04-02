@@ -13,6 +13,9 @@ export interface EventViewDto {
   chips: string[];
   isRegistered: boolean;
   isPast: boolean;
+  dateISO?: string;
+  endDateISO?: string;
+  organizerName?: string;
 }
 
 export interface TeacherEventViewDto {

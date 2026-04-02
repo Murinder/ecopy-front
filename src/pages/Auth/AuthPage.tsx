@@ -6,7 +6,7 @@ import CoursesIcon from '../../assets/icons/mjbmnzii-qcfmg4x.svg';
 import CertificatesIcon from '../../assets/icons/mjbmnzii-hptfss7.svg';
 import CommunityIcon from '../../assets/icons/mjbmnzii-ba5ispw.svg';
 import ScheduleIcon from '../../assets/icons/mjbmnzii-lc4urbp.svg';
-import { useLoginMutation, useRegisterMutation, useLazyGetProfileQuery } from '../../services/coreApi';
+import { useLoginMutation, useRegisterMutation, useLazyGetProfileQuery, useForgotPasswordMutation } from '../../services/coreApi';
 import { useAppDispatch } from '../../app/hooks';
 import { setToken, setUserId, setUserName, setUserRole, setRememberMe } from '../../features/auth/authSlice';
 
@@ -36,11 +36,27 @@ const AuthPage = () => {
   const [remember, setRemember] = useState(false);
   const [errorText, setErrorText] = useState<string | undefined>();
 
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotStatus, setForgotStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+
   const [login, { isLoading: loginLoading }] = useLoginMutation();
   const [register, { isLoading: registerLoading }] = useRegisterMutation();
+  const [forgotPassword] = useForgotPasswordMutation();
   const [fetchProfile] = useLazyGetProfileQuery();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+
+  const onForgotSubmit = async () => {
+    if (!forgotEmail.trim()) return;
+    setForgotStatus('sending');
+    try {
+      await forgotPassword({ email: forgotEmail.trim() }).unwrap();
+      setForgotStatus('sent');
+    } catch {
+      setForgotStatus('error');
+    }
+  };
 
   type DemoUserKey = 'student' | 'teacher' | 'head';
 
@@ -184,7 +200,7 @@ const AuthPage = () => {
                     </label>
                   </div>
                   <div className={styles.link}>
-                    <a className={styles.a6}>Забыли пароль?</a>
+                    <a className={styles.a6} style={{ cursor: 'pointer' }} onClick={() => { setForgotOpen(true); setForgotEmail(email); setForgotStatus('idle'); }}>Забыли пароль?</a>
                   </div>
                 </div>
                 <div className={styles.testUsers}>
@@ -261,22 +277,55 @@ const AuthPage = () => {
                 </div>
               </>
             )}
-            <div className={styles.button} onClick={onSubmit}>
+            <button type="button" className={styles.button} onClick={onSubmit}>
               <p className={styles.a7}>
                 {tab === 'login' ? (loginLoading ? 'Входим...' : 'Войти') : registerLoading ? 'Регистрируем...' : 'Зарегистрироваться'}
               </p>
-            </div>
+            </button>
             <div className={styles.app5}>
               <div className={styles.container3} />
               <div className={styles.text}>
                 <p className={styles.a8}>или</p>
               </div>
             </div>
-            <div className={styles.button2}>
+            <button type="button" className={styles.button2} disabled>
               <p className={styles.aSso}>Войти через SSO</p>
-            </div>
+            </button>
             {errorText && (
               <div style={{ marginTop: 16, color: '#d00' }}>{errorText}</div>
+            )}
+
+            {forgotOpen && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setForgotOpen(false)}>
+                <div style={{ background: '#fff', borderRadius: 16, padding: '32px 28px', width: 380, maxWidth: '90vw' }} onClick={(e) => e.stopPropagation()}>
+                  <h3 style={{ margin: '0 0 8px', fontSize: 18, color: '#0e1d45' }}>Восстановление пароля</h3>
+                  <p style={{ margin: '0 0 16px', fontSize: 14, color: '#64748b' }}>Введите email, и мы отправим ссылку для сброса пароля</p>
+                  {forgotStatus === 'sent' ? (
+                    <div style={{ textAlign: 'center' }}>
+                      <p style={{ color: '#16a34a', marginBottom: 16 }}>Письмо отправлено на {forgotEmail}</p>
+                      <button type="button" className={styles.button} onClick={() => setForgotOpen(false)} style={{ width: '100%' }}>
+                        <p className={styles.a7}>Закрыть</p>
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <input
+                        className={styles.studentUniversityEdu}
+                        style={{ width: '100%', marginBottom: 16, padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 8 }}
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        placeholder="Email"
+                      />
+                      {forgotStatus === 'error' && (
+                        <p style={{ color: '#d00', fontSize: 13, margin: '0 0 12px' }}>Не удалось отправить. Проверьте email.</p>
+                      )}
+                      <button type="button" className={styles.button} onClick={onForgotSubmit} style={{ width: '100%' }}>
+                        <p className={styles.a7}>{forgotStatus === 'sending' ? 'Отправка...' : 'Отправить ссылку'}</p>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         </div>

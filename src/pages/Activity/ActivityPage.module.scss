@@ -984,6 +984,33 @@
   font-weight: 800;
 }
 
+.empty {
+  color: #9ca3af;
+  font-size: 14px;
+  text-align: center;
+  padding: 24px 0;
+}
+
+.simpleTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.simpleTable th {
+  text-align: left;
+  color: #6a7282;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.simpleTable td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #f5f5f5;
+  color: #0a0a0a;
+}
+
 @media (max-width: 1024px) {
   .chartsRow {
     grid-template-columns: 1fr;

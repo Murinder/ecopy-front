@@ -9,8 +9,8 @@ import AwardIcon from '../../assets/icons/ui-award.svg';
 import PeopleIcon from '../../assets/icons/mjbmqg4r-g71l6vp.svg';
 import FileIcon from '../../assets/icons/ui-file.svg';
 import { useAppSelector } from '../../app/hooks';
-import { useGetTeachersQuery } from '../../services/coreApi';
-import type { UserProfileDto } from '../../services/coreApi';
+import { useGetTeachersDetailedQuery } from '../../services/coreApi';
+import type { TeacherDetailedDto } from '../../services/coreApi';
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 const initialsFromName = (name: string) =>
@@ -23,64 +23,7 @@ const initialsFromName = (name: string) =>
     .join('')
     .toUpperCase() || 'ИИ';
 
-type TeacherItem = {
-  id: string;
-  name: string;
-  title: string;
-  rating: number;
-  activeProjects: number;
-  totalProjects: number;
-  students: number;
-  completion: number;
-  avgGrade: number;
-  publications: number;
-  grants: number;
-  hours: number;
-  consultations: number;
-  activity: { name: string; consultations: number; projects: number }[];
-  success: { name: string; value: number }[];
-  projectsStats: { active: number; done: number };
-  studentsStats: { total: number; active: number };
-  scienceStats: { publications: number; grants: number };
-};
-
 type SortKey = 'rating' | 'projects' | 'publications';
-
-const defaultActivity = [
-  { name: 'Сен', consultations: 0, projects: 0 },
-  { name: 'Окт', consultations: 0, projects: 0 },
-  { name: 'Ноя', consultations: 0, projects: 0 },
-  { name: 'Дек', consultations: 0, projects: 0 },
-  { name: 'Янв', consultations: 0, projects: 0 },
-  { name: 'Фев', consultations: 0, projects: 0 },
-];
-
-const defaultSuccess = [
-  { name: 'Отлично', value: 0 },
-  { name: 'Хорошо', value: 0 },
-  { name: 'Удовл.', value: 0 },
-];
-
-const mapProfileToTeacher = (p: UserProfileDto): TeacherItem => ({
-  id: p.id,
-  name: [p.lastName, p.firstName].filter(Boolean).join(' ') || p.email || 'Преподаватель',
-  title: 'Преподаватель',
-  rating: 0,
-  activeProjects: 0,
-  totalProjects: 0,
-  students: 0,
-  completion: 0,
-  avgGrade: 0,
-  publications: 0,
-  grants: 0,
-  hours: 0,
-  consultations: 0,
-  activity: defaultActivity,
-  success: defaultSuccess,
-  projectsStats: { active: 0, done: 0 },
-  studentsStats: { total: 0, active: 0 },
-  scienceStats: { publications: 0, grants: 0 },
-});
 
 
 const TeachersPage = () => {
@@ -89,18 +32,14 @@ const TeachersPage = () => {
   const initials = useMemo(() => initialsFromName(userName), [userName]);
   const isHead = userRole === 'Заведующий кафедрой';
 
-  const { data: teachersData, isLoading: teachersLoading, isError: teachersError } = useGetTeachersQuery();
+  const { data: teachersData, isLoading: teachersLoading, isError: teachersError } = useGetTeachersDetailedQuery();
 
   const [query, setQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortKey>('rating');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const teachers = useMemo<TeacherItem[]>(() => {
-    const apiTeachers = teachersData?.data;
-    if (apiTeachers && apiTeachers.length > 0) {
-      return apiTeachers.map(mapProfileToTeacher);
-    }
-    return [];
+  const teachers = useMemo<TeacherDetailedDto[]>(() => {
+    return teachersData?.data ?? [];
   }, [teachersData]);
 
   const filtered = useMemo(() => {

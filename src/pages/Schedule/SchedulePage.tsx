@@ -14,8 +14,10 @@ import {
   useCreateLessonMutation,
   useGetDefensesQuery,
   useCreateDefenseMutation,
+  useUpdateDefenseStatusMutation,
 } from '../../services/eventApi';
 import type { LessonDto, DefenseDto as ApiDefenseDto } from '../../services/eventApi';
+import { useGetStudentsQuery } from '../../services/coreApi';
 
 type WeekdayKey = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI';
 type LessonType = 'Лекция' | 'Семинар' | 'Практика';
@@ -490,17 +492,28 @@ const mapApiDefenseToLocal = (dto: ApiDefenseDto): DefenseItem => ({
 const HeadDefenseScheduleView = ({ avatarInitials, userId }: { avatarInitials: string; userId: string }) => {
   const { data: defensesData, isLoading: defensesLoading, isError: defensesError } = useGetDefensesQuery({ supervisorId: userId }, { skip: !userId });
   const [createDefenseApi] = useCreateDefenseMutation();
+  const [updateDefenseStatusApi] = useUpdateDefenseStatusMutation();
+  const { data: studentsData } = useGetStudentsQuery();
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedDefenseId, setSelectedDefenseId] = useState<string | null>(null);
 
-  const initialSelectedDate = useMemo(() => new Date(2025, 10, 20), []);
-  const [selectedDateIso, setSelectedDateIso] = useState(() => dateIsoFromDate(initialSelectedDate));
+  const now = useMemo(() => new Date(), []);
+  const [selectedDateIso, setSelectedDateIso] = useState(() => dateIsoFromDate(now));
 
-  const initialMonth = useMemo(() => ({ year: 2025, month0: 10 }), []);
-  const [{ year, month0 }, setMonth] = useState(() => initialMonth);
+  const [{ year, month0 }, setMonth] = useState(() => ({ year: now.getFullYear(), month0: now.getMonth() }));
 
-  const students: { id: string; name: string; projectTitle: string; supervisor: string; reviewersCount: number }[] = [];
+  const students = useMemo(() => {
+    const list = studentsData?.data;
+    if (!list) return [];
+    return list.map((s) => ({
+      id: s.id,
+      name: [s.lastName, s.firstName].filter(Boolean).join(' ') || s.email,
+      projectTitle: '',
+      supervisor: '',
+      reviewersCount: 3,
+    }));
+  }, [studentsData]);
 
   const defenses = useMemo<DefenseItem[]>(() => {
     const apiDefenses = defensesData?.data;
@@ -570,7 +583,13 @@ const HeadDefenseScheduleView = ({ avatarInitials, userId }: { avatarInitials: s
   };
   const closeView = () => setSelectedDefenseId(null);
 
-  const [studentDraft, setStudentDraft] = useState(students[0].id);
+  const [studentDraft, setStudentDraft] = useState('');
+
+  useEffect(() => {
+    if (students.length > 0 && !studentDraft) {
+      setStudentDraft(students[0].id);
+    }
+  }, [students]);
   const [typeDraft, setTypeDraft] = useState<DefenseType>('ВКР');
   const [dateDraft, setDateDraft] = useState(selectedDateIso);
   const [timeDraft, setTimeDraft] = useState('10:00');
@@ -619,15 +638,18 @@ const HeadDefenseScheduleView = ({ avatarInitials, userId }: { avatarInitials: s
     setRoomDraft('');
   };
 
-  const completeDefense = () => {
+  const completeDefense = async () => {
     if (!selectedDefenseId) return;
     const grade = Number(gradeDraft);
     if (!Number.isFinite(grade) || grade < 2 || grade > 5) {
       window.alert('Укажите оценку от 2 до 5');
       return;
     }
-    // Note: with API, this would call updateDefenseStatus mutation
-    // For now, close the view - the API will reflect the change on next fetch
+    try {
+      await updateDefenseStatusApi({ defenseId: selectedDefenseId, status: 'DONE', grade }).unwrap();
+    } catch {
+      // API error — RTK Query will show stale data until next refetch
+    }
     closeView();
   };
 

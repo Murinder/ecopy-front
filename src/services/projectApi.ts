@@ -17,7 +17,8 @@ export interface ProjectDto {
 export interface ProjectMemberDto {
   projectId: string;
   userId: string;
-  role: 'LEADER' | 'MEMBER';
+  userName?: string;
+  role: 'LEADER' | 'MEMBER' | 'MENTOR' | 'OBSERVER';
   joinedAt?: string;
 }
 
@@ -29,6 +30,17 @@ export interface TaskDto {
   status: 'TO_DO' | 'IN_PROGRESS' | 'REVIEW' | 'DONE' | 'BLOCKED';
   assignedTo?: string;
   dueDate?: string;
+}
+
+export interface DocumentDto {
+  id: string;
+  projectId: string;
+  taskId?: string;
+  filePath: string;
+  version?: number;
+  uploadedBy?: string;
+  createdAt?: string;
+  description?: string;
 }
 
 export interface ApiResponse<T> {
@@ -49,7 +61,7 @@ export const projectApi = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Projects', 'Tasks'],
+  tagTypes: ['Projects', 'Tasks', 'Documents'],
   endpoints: (builder) => ({
     getUserProjects: builder.query<ApiResponse<ProjectDto[]>, string>({
       query: (userId) => ({
@@ -102,6 +114,40 @@ export const projectApi = createApi({
       query: (projectId) => `/api/v1/projects/${projectId}/members`,
       providesTags: ['Projects'],
     }),
+    addProjectMember: builder.mutation<ApiResponse<ProjectMemberDto>, { projectId: string; userId: string; role: string }>({
+      query: ({ projectId, userId, role }) => ({
+        url: `/api/v1/projects/${projectId}/members`,
+        method: 'POST',
+        params: { userId, role },
+      }),
+      invalidatesTags: ['Projects'],
+    }),
+    removeProjectMember: builder.mutation<ApiResponse<void>, { projectId: string; userId: string }>({
+      query: ({ projectId, userId }) => ({
+        url: `/api/v1/projects/${projectId}/members/${userId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Projects'],
+    }),
+    getProjectDocuments: builder.query<ApiResponse<DocumentDto[]>, string>({
+      query: (projectId) => `/api/v1/documents/project/${projectId}`,
+      providesTags: ['Documents'],
+    }),
+    uploadDocument: builder.mutation<ApiResponse<DocumentDto>, FormData>({
+      query: (formData) => ({
+        url: '/api/v1/documents/upload',
+        method: 'POST',
+        body: formData,
+      }),
+      invalidatesTags: ['Documents'],
+    }),
+    deleteDocument: builder.mutation<ApiResponse<void>, string>({
+      query: (documentId) => ({
+        url: `/api/v1/documents/${documentId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['Documents'],
+    }),
   }),
 });
 
@@ -113,4 +159,9 @@ export const {
   useUpdateTaskMutation,
   useChangeTaskStatusMutation,
   useGetProjectMembersQuery,
+  useAddProjectMemberMutation,
+  useRemoveProjectMemberMutation,
+  useGetProjectDocumentsQuery,
+  useUploadDocumentMutation,
+  useDeleteDocumentMutation,
 } = projectApi;

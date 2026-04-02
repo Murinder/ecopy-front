@@ -49,6 +49,26 @@ export interface UserProfileDto {
   isActive?: boolean;
   lastLogin?: string;
   createdAt?: string;
+  studyForm?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  interests?: string;
+}
+
+export interface FacultyDto {
+  id: string;
+  name: string;
+  code?: string;
+  description?: string;
+}
+
+export interface DepartmentDto {
+  id: string;
+  name: string;
+  code?: string;
+  facultyId?: string;
+  facultyName?: string;
+  description?: string;
 }
 
 export interface StudentInfoDto {
@@ -94,24 +114,138 @@ export interface UserLanguageDto {
   proficiency: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'FLUENT' | 'NATIVE';
 }
 
+export interface TeacherDetailedDto {
+  id: string;
+  name: string;
+  title: string;
+  rating: number;
+  activeProjects: number;
+  totalProjects: number;
+  students: number;
+  completion: number;
+  avgGrade: number;
+  publications: number;
+  grants: number;
+  hours: number;
+  consultations: number;
+  activity: { name: string; consultations: number; projects: number }[];
+  success: { name: string; value: number }[];
+  projectsStats: { active: number; done: number };
+  studentsStats: { total: number; active: number };
+  scienceStats: { publications: number; grants: number };
+}
+
+export interface KpiItem {
+  label: string;
+  value: number;
+  delta: string;
+  icon?: string;
+  iconTone: string;
+}
+
+export interface SimpleKpi {
+  title: string;
+  value: string;
+  sub: string;
+}
+
+export interface ChartPoint {
+  name: string;
+  value?: number;
+  created?: number;
+  done?: number;
+  graduation?: number;
+  avgGrade?: number;
+  projects?: number;
+  events?: number;
+  publications?: number;
+}
+
+export interface PieSlice {
+  [key: string]: string | number;
+  name: string;
+  value: number;
+  color: string;
+}
+
+export interface ActivityItem {
+  id: string;
+  initials: string;
+  name: string;
+  actionTitle: string;
+  actionSub: string;
+  timeAgo: string;
+  tone: string;
+}
+
+export interface StudentItem {
+  id: string;
+  initials: string;
+  name: string;
+  project: string;
+  tasksDone: number;
+  tasksTotal: number;
+  lastActive: string;
+}
+
+export interface AttentionProject {
+  id: string;
+  title: string;
+  statusLabel: string;
+  statusTone: string;
+  members: string;
+  issue: string;
+  issueTone: string;
+}
+
+export interface ActivityLogItem {
+  user: string;
+  action: string;
+  date: string;
+  status: string;
+}
+
+export interface SubjectItem {
+  name: string;
+  grade: number;
+  attendance: number;
+}
+
+export interface GroupPerformance {
+  name: string;
+  activity: number;
+  attendance: number;
+  avgGrade: number;
+}
+
 export interface DashboardSummaryDto {
   role: string;
-  kpis?: { label: string; value: number; delta: string; icon?: string; iconTone: string }[];
-  studentKpis?: { title: string; value: string; sub: string }[];
-  headKpis?: { label: string; value: number; delta: string; icon?: string; iconTone: string }[];
-  weeklyChart?: Record<string, unknown>[];
-  studentProgress?: Record<string, unknown>[];
-  lastActivity?: Record<string, unknown>[];
-  activeStudents?: Record<string, unknown>[];
-  attentionProjects?: Record<string, unknown>[];
-  barData?: Record<string, unknown>[];
-  pieData?: Record<string, unknown>[];
-  activities?: Record<string, unknown>[];
-  subjectsData?: Record<string, unknown>[];
-  performanceByGroup?: Record<string, unknown>[];
-  studentsByCourse?: Record<string, unknown>[];
-  semesters?: Record<string, unknown>[];
-  activityByMonth?: Record<string, unknown>[];
+  kpis?: KpiItem[];
+  studentKpis?: SimpleKpi[];
+  headKpis?: KpiItem[];
+  weeklyChart?: ChartPoint[];
+  studentProgress?: ChartPoint[];
+  lastActivity?: ActivityItem[];
+  activeStudents?: StudentItem[];
+  attentionProjects?: AttentionProject[];
+  barData?: ChartPoint[];
+  pieData?: PieSlice[];
+  activities?: ActivityLogItem[];
+  subjectsData?: SubjectItem[];
+  performanceByGroup?: GroupPerformance[];
+  studentsByCourse?: PieSlice[];
+  semesters?: ChartPoint[];
+  activityByMonth?: ChartPoint[];
+}
+
+export interface NotificationDto {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type?: string;
+  isRead: boolean;
+  createdAt: string;
 }
 
 export const coreApi = createApi({
@@ -124,7 +258,7 @@ export const coreApi = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Applications', 'Profile', 'Teachers', 'UserLinks', 'UserSkills', 'UserLanguages'],
+  tagTypes: ['Applications', 'Profile', 'Teachers', 'Students', 'UserLinks', 'UserSkills', 'UserLanguages', 'Notifications'],
   endpoints: (builder) => ({
     login: builder.mutation<ApiResponse<TokenDto>, LoginRequest>({
       query: (body) => ({
@@ -140,11 +274,31 @@ export const coreApi = createApi({
         body,
       }),
     }),
+    forgotPassword: builder.mutation<ApiResponse<void>, { email: string }>({
+      query: (body) => ({
+        url: '/api/v1/auth/forgot-password',
+        method: 'POST',
+        body,
+      }),
+    }),
+    resetPassword: builder.mutation<ApiResponse<void>, { token: string; newPassword: string }>({
+      query: (body) => ({
+        url: '/api/v1/auth/reset-password',
+        method: 'POST',
+        body,
+      }),
+    }),
     getProfile: builder.query<ApiResponse<UserProfileDto>, string>({
       query: (userId) => ({
         url: `/api/v1/auth/profile/${userId}`,
       }),
       providesTags: ['Profile'],
+    }),
+    getFaculty: builder.query<FacultyDto, string>({
+      query: (facultyId) => `/api/v1/faculties/${facultyId}`,
+    }),
+    getDepartment: builder.query<DepartmentDto, string>({
+      query: (departmentId) => `/api/v1/departments/${departmentId}`,
     }),
     updateProfile: builder.mutation<
       ApiResponse<UserProfileDto>,
@@ -163,6 +317,18 @@ export const coreApi = createApi({
       }),
       providesTags: ['Teachers'],
     }),
+    getTeachersDetailed: builder.query<ApiResponse<TeacherDetailedDto[]>, void>({
+      query: () => ({
+        url: '/api/v1/users/teachers/detailed',
+      }),
+      providesTags: ['Teachers'],
+    }),
+    getStudents: builder.query<ApiResponse<UserProfileDto[]>, void>({
+      query: () => ({
+        url: '/api/v1/users/students',
+      }),
+      providesTags: ['Students'],
+    }),
     getLecturerApplications: builder.query<ApiResponse<ApplicationViewDto[]>, string>({
       query: (lecturerId) => ({
         url: `/api/v1/applications/lecturer/${lecturerId}`,
@@ -179,6 +345,25 @@ export const coreApi = createApi({
       query: (userId) => ({
         url: `/api/v1/dashboards/${userId}/summary`,
       }),
+    }),
+    getNotifications: builder.query<ApiResponse<NotificationDto[]>, string>({
+      query: (userId) => ({
+        url: `/api/v1/notifications/user/${userId}`,
+      }),
+      providesTags: ['Notifications'],
+    }),
+    getUnreadCount: builder.query<ApiResponse<number>, string>({
+      query: (userId) => ({
+        url: `/api/v1/notifications/user/${userId}/unread-count`,
+      }),
+      providesTags: ['Notifications'],
+    }),
+    markNotificationRead: builder.mutation<ApiResponse<void>, string>({
+      query: (notificationId) => ({
+        url: `/api/v1/notifications/${notificationId}/mark-read`,
+        method: 'PUT',
+      }),
+      invalidatesTags: ['Notifications'],
     }),
     updateApplicationStatus: builder.mutation<
       ApiResponse<ApplicationViewDto>,
@@ -254,6 +439,8 @@ export const {
   useLazyGetProfileQuery,
   useUpdateProfileMutation,
   useGetTeachersQuery,
+  useGetTeachersDetailedQuery,
+  useGetStudentsQuery,
   useGetLecturerApplicationsQuery,
   useGetStudentApplicationsQuery,
   useUpdateApplicationStatusMutation,
@@ -268,4 +455,11 @@ export const {
   useGetUserLanguagesQuery,
   useCreateUserLanguageMutation,
   useDeleteUserLanguageMutation,
+  useForgotPasswordMutation,
+  useResetPasswordMutation,
+  useGetNotificationsQuery,
+  useGetUnreadCountQuery,
+  useMarkNotificationReadMutation,
+  useGetFacultyQuery,
+  useGetDepartmentQuery,
 } = coreApi;

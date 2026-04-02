@@ -437,6 +437,23 @@
   background: #eff6ff;
 }
 
+.loading,
+.error {
+  text-align: center;
+  padding: 24px;
+  font-size: 14px;
+  color: #6a7282;
+}
+.error {
+  color: #ef4444;
+}
+.empty {
+  text-align: center;
+  padding: 16px;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
 @media (max-width: 1024px) {
   .grid3 {
     grid-template-columns: 1fr;
