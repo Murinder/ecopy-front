@@ -53,6 +53,42 @@ export interface UserProfileDto {
   emergencyContactName?: string;
   emergencyContactPhone?: string;
   interests?: string;
+  // Teacher-specific
+  position?: string;
+  degree?: string;
+  teacherId?: string;
+  experience?: string;
+  office?: string;
+  officeHours?: string;
+  website?: string;
+  linkedin?: string;
+  // Head-specific academic fields
+  academicTitle?: string;
+  headSince?: string;
+  dissertationTitle?: string;
+  dissertationYear?: number;
+  educationHistory?: string;
+  // Resolved names
+  facultyName?: string;
+  departmentName?: string;
+}
+
+export interface HeadProfileDto {
+  profile: UserProfileDto;
+  publications: number;
+  monographs: number;
+  articles: number;
+  conferences: number;
+  grants: number;
+  hours: number;
+  consultations: number;
+  teachingStartYear?: number;
+  supervisedPhd: number;
+  supervisedMasters: number;
+  supervisedBachelors: number;
+  departmentTeacherCount: number;
+  departmentStudentCount: number;
+  awards?: { id: string; title: string; year: string }[];
 }
 
 export interface FacultyDto {
@@ -294,6 +330,10 @@ export const coreApi = createApi({
       }),
       providesTags: ['Profile'],
     }),
+    getHeadProfileDetails: builder.query<ApiResponse<HeadProfileDto>, string>({
+      query: (userId) => `/api/v1/auth/profile/${userId}/head-details`,
+      providesTags: ['Profile'],
+    }),
     getFaculty: builder.query<FacultyDto, string>({
       query: (facultyId) => `/api/v1/faculties/${facultyId}`,
     }),
@@ -436,6 +476,7 @@ export const {
   useLoginMutation,
   useRegisterMutation,
   useGetProfileQuery,
+  useGetHeadProfileDetailsQuery,
   useLazyGetProfileQuery,
   useUpdateProfileMutation,
   useGetTeachersQuery,

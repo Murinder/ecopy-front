@@ -30,6 +30,7 @@ import {
   useDeleteUserLanguageMutation,
   useGetFacultyQuery,
   useGetDepartmentQuery,
+  useGetHeadProfileDetailsQuery,
 } from '../../services/coreApi';
 import { useGetRatingBreakdownQuery } from '../../services/ratingApi';
 
@@ -682,54 +683,75 @@ const HeadProfileView = ({ userName, userId }: { userName: string; userId: strin
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { data: profileData } = useGetProfileQuery(userId, { skip: !userId });
+  const { data: headData } = useGetHeadProfileDetailsQuery(userId, { skip: !userId });
+  // Trigger API calls for skills/links/languages (data available for future UI sections)
+  useGetUserLinksQuery(userId, { skip: !userId });
+  useGetUserSkillsQuery(userId, { skip: !userId });
+  useGetUserLanguagesQuery(userId, { skip: !userId });
   const [updateProfileApi] = useUpdateProfileMutation();
 
-  const apiName = profileData?.data
-    ? [profileData.data.firstName, profileData.data.lastName].filter(Boolean).join(' ')
-    : '';
+  const p = profileData?.data;
+  const h = headData?.data;
+  const apiName = p ? [p.firstName, p.lastName].filter(Boolean).join(' ') : '';
+
+  const parseEducation = (json?: string): TeacherEducationItem[] => {
+    if (!json) return [];
+    try {
+      return (JSON.parse(json) as { degree: string; university: string; program: string; year: string }[]).map((e, i) => ({
+        id: `edu-${i}`,
+        degree: e.degree,
+        university: e.university,
+        program: e.program,
+        year: e.year,
+      }));
+    } catch { return []; }
+  };
+
+  const currentYear = new Date().getFullYear();
+  const headSinceYear = p?.headSince ? new Date(p.headSince).getFullYear() : undefined;
+  const teachingYears = h?.teachingStartYear ? currentYear - h.teachingStartYear : 0;
 
   const initial = useMemo<HeadProfile>(
     () => ({
-      fullName: apiName || userName?.trim() || 'Смирнов Владимир Игоревич',
+      fullName: apiName || userName?.trim() || '',
       role: 'Заведующий кафедрой',
-      degree: 'Доктор технических наук',
-      title: 'Профессор',
-      headSince: '2015',
-      headId: 'H-2015-234',
-      email: profileData?.data?.email || 'v.smirnov@university.edu',
-      phone: profileData?.data?.phoneNumber || '+7 (999) 111-22-33',
-      faculty: 'Факультет информационных технологий',
-      department: 'Кафедра программной инженерии',
-      dissertationTitle: 'Методы оптимизации распределенных систем обработки данных',
-      dissertationYear: '2008',
-      education: [
-        {
-          id: 'hed-1',
-          degree: 'Доктор технических наук',
-          university: 'Московский государственный университет',
-          program: 'Информатика и вычислительная техника',
-          year: '2008',
-        },
-        {
-          id: 'hed-2',
-          degree: 'Кандидат технических наук',
-          university: 'Московский государственный университет',
-          program: 'Математическое моделирование',
-          year: '1998',
-        },
-      ],
-      interests: ['Распределенные системы', 'Облачные вычисления', 'Искусственный интеллект', 'Big Data', 'Программная инженерия'],
-      awards: [
-        { id: 'ha-1', title: 'Заслуженный работник высшей школы РФ', year: '2019' },
-        { id: 'ha-2', title: 'Почетный работник образования', year: '2016' },
-        { id: 'ha-3', title: 'Лауреат премии Правительства РФ в области образования', year: '2014' },
-      ],
-      experience: { total: '28 лет', teaching: '28 лет', head: 'с 2015', from: '01.09.2015' },
-      publications: { total: 156, monographs: 4, articles: 98, conferences: 54 },
-      leadership: { phd: 12, masters: 45, bachelors: 156 },
-      admin: { teachers: 24, students: 342, yearsLeading: 10 },
+      degree: p?.degree || '',
+      title: p?.academicTitle || '',
+      headSince: headSinceYear ? String(headSinceYear) : '',
+      headId: p?.teacherId || '',
+      email: p?.email || '',
+      phone: p?.phoneNumber || '',
+      faculty: p?.facultyName || '',
+      department: p?.departmentName || '',
+      dissertationTitle: p?.dissertationTitle || '',
+      dissertationYear: p?.dissertationYear ? String(p.dissertationYear) : '',
+      education: parseEducation(p?.educationHistory),
+      interests: p?.interests ? p.interests.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
+      awards: (h?.awards || []).map((a) => ({ id: a.id, title: a.title, year: a.year })),
+      experience: {
+        total: teachingYears ? `${teachingYears} лет` : '—',
+        teaching: teachingYears ? `${teachingYears} лет` : '—',
+        head: headSinceYear ? `с ${headSinceYear}` : '—',
+        from: p?.headSince ? new Date(p.headSince).toLocaleDateString('ru-RU') : '—',
+      },
+      publications: {
+        total: h?.publications ?? 0,
+        monographs: h?.monographs ?? 0,
+        articles: h?.articles ?? 0,
+        conferences: h?.conferences ?? 0,
+      },
+      leadership: {
+        phd: h?.supervisedPhd ?? 0,
+        masters: h?.supervisedMasters ?? 0,
+        bachelors: h?.supervisedBachelors ?? 0,
+      },
+      admin: {
+        teachers: h?.departmentTeacherCount ?? 0,
+        students: h?.departmentStudentCount ?? 0,
+        yearsLeading: headSinceYear ? currentYear - headSinceYear : 0,
+      },
     }),
-    [userName, apiName, profileData]
+    [userName, apiName, profileData, headData]
   );
 
   const [profile, setProfile] = useState<HeadProfile>(initial);
@@ -766,6 +788,11 @@ const HeadProfileView = ({ userName, userId }: { userName: string; userId: strin
           lastName: nameParts[1] || '',
           email: draft.email,
           phoneNumber: draft.phone,
+          degree: draft.degree || undefined,
+          academicTitle: draft.title || undefined,
+          dissertationTitle: draft.dissertationTitle || undefined,
+          dissertationYear: draft.dissertationYear ? Number(draft.dissertationYear) : undefined,
+          interests: draft.interests.length ? draft.interests.join(',') : undefined,
         },
       }).unwrap();
       setProfile(draft);
@@ -813,14 +840,18 @@ const HeadProfileView = ({ userName, userId }: { userName: string; userId: strin
                   <img src={PinIcon} className={styles.headHighlightIcon} />
                   Заведующий кафедрой
                 </div>
-                <div className={styles.headHighlightRow}>
-                  <img src={AwardIcon} className={styles.headHighlightIcon} />
-                  {profile.awards[0].title}
-                </div>
-                <div className={styles.headHighlightRow}>
-                  <img src={AwardIcon} className={styles.headHighlightIcon} />
-                  {profile.awards[1].title}
-                </div>
+                {profile.awards[0] && (
+                  <div className={styles.headHighlightRow}>
+                    <img src={AwardIcon} className={styles.headHighlightIcon} />
+                    {profile.awards[0].title}
+                  </div>
+                )}
+                {profile.awards[1] && (
+                  <div className={styles.headHighlightRow}>
+                    <img src={AwardIcon} className={styles.headHighlightIcon} />
+                    {profile.awards[1].title}
+                  </div>
+                )}
               </div>
             </div>
             <div>
@@ -1070,22 +1101,24 @@ const TeacherProfileView = ({ userName, userId }: { userName: string; userId: st
     ? [profileData.data.firstName, profileData.data.lastName].filter(Boolean).join(' ')
     : '';
 
+  const pd = profileData?.data;
+
   const initial = useMemo<TeacherProfile>(
     () => ({
-      fullName: apiName || userName || 'Петров Александр Владимирович',
-      position: 'Доцент',
-      degree: 'Кандидат технических наук',
+      fullName: apiName || userName || '',
+      position: pd?.position || '',
+      degree: pd?.degree || '',
       role: 'Преподаватель',
-      teacherId: 'T-2018-567',
-      experience: '15 лет',
-      about:
-        'Преподаватель с 15-летним стажем. Специализируюсь на разработке программного обеспечения и веб-технологиях. Активно занимаюсь научной работой в области искусственного интеллекта и машинного обучения.',
-      email: profileData?.data?.email || 'a.petrov@university.edu',
-      phone: profileData?.data?.phoneNumber || '+7 (999) 888-77-66',
-      office: 'Главный корпус, кабинет 401',
-      officeHours: 'Вторник, Четверг 14:00-16:00',
-      faculty: 'Факультет информационных технологий',
-      department: 'Кафедра программной инженерии',
+      teacherId: pd?.teacherId || '',
+      experience: pd?.experience || '',
+      about: pd?.bio || '',
+      email: pd?.email || '',
+      phone: pd?.phoneNumber || '',
+      office: pd?.office || '',
+      officeHours: pd?.officeHours || '',
+      faculty: pd?.facultyName || '',
+      department: pd?.departmentName || '',
+      // TODO: education, disciplines, interests, stats, awards need backend support
       education: [
         {
           id: 'e1',
@@ -1103,17 +1136,17 @@ const TeacherProfileView = ({ userName, userId }: { userName: string; userId: st
         },
       ],
       disciplines: ['Алгоритмы и структуры данных', 'Веб-разработка', 'Программная инженерия', 'Проектирование информационных систем'],
-      interests: ['Искусственный интеллект', 'Машинное обучение', 'Веб-технологии', 'Облачные вычисления'],
+      interests: pd?.interests ? pd.interests.split(',').map((s: string) => s.trim()) : ['Искусственный интеллект', 'Машинное обучение', 'Веб-технологии', 'Облачные вычисления'],
       stats: { publications: 24, conferences: 15, patents: 3 },
       awards: [
         { id: 'a1', title: 'Лучший преподаватель года', year: '2023' },
         { id: 'a2', title: 'Грант РФФИ', year: '2022' },
         { id: 'a3', title: 'Благодарность ректора', year: '2021' },
       ],
-      website: 'https://petrov.edu',
-      linkedin: 'https://linkedin.com/in/petrov',
+      website: pd?.website || '',
+      linkedin: pd?.linkedin || '',
     }),
-    [userName, apiName, profileData]
+    [userName, apiName, pd]
   );
 
   const [profile, setProfile] = useState<TeacherProfile>(initial);

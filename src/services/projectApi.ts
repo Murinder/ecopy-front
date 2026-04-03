@@ -12,6 +12,9 @@ export interface ProjectDto {
   departmentId?: string;
   createdAt?: string;
   updatedAt?: string;
+  templateType?: string;
+  taskCount?: number;
+  completedTaskCount?: number;
 }
 
 export interface ProjectMemberDto {
@@ -43,6 +46,39 @@ export interface DocumentDto {
   description?: string;
 }
 
+export interface MemberTaskSummary {
+  userId: string;
+  firstName?: string;
+  lastName?: string;
+  tasksDone: number;
+  tasksTotal: number;
+}
+
+export interface ProjectWithTaskSummary {
+  id: string;
+  title: string;
+  description?: string;
+  projectType?: string;
+  createdBy?: string;
+  status: string;
+  startDate?: string;
+  endDate?: string;
+  memberCount: number;
+  tasksDone: number;
+  tasksTotal: number;
+  tasksReview: number;
+  tasksBlocked: number;
+  members: MemberTaskSummary[];
+}
+
+export interface DepartmentDashboardDto {
+  totalProjects: number;
+  activeProjects: number;
+  completedProjects: number;
+  projects: ProjectWithTaskSummary[];
+  projectsByMonth?: Record<string, number>;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   code?: string;
@@ -67,6 +103,10 @@ export const projectApi = createApi({
       query: (userId) => ({
         url: `/api/v1/projects/user/${userId}`,
       }),
+      providesTags: ['Projects'],
+    }),
+    getDepartmentDashboard: builder.query<ApiResponse<DepartmentDashboardDto>, string>({
+      query: (departmentId) => `/api/v1/projects/department/${departmentId}/dashboard`,
       providesTags: ['Projects'],
     }),
     createProject: builder.mutation<ApiResponse<ProjectDto>, Partial<ProjectDto>>({
@@ -153,6 +193,7 @@ export const projectApi = createApi({
 
 export const {
   useGetUserProjectsQuery,
+  useGetDepartmentDashboardQuery,
   useCreateProjectMutation,
   useGetProjectTasksQuery,
   useCreateTaskMutation,

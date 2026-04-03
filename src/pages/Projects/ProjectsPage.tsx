@@ -26,9 +26,10 @@ import {
   useGetProjectDocumentsQuery,
   useUploadDocumentMutation,
   useDeleteDocumentMutation,
+  useGetDepartmentDashboardQuery,
 } from '../../services/projectApi';
-import type { TaskDto, ProjectDto } from '../../services/projectApi';
-import { useGetStudentsQuery, useGetTeachersQuery } from '../../services/coreApi';
+import type { TaskDto, ProjectDto, DocumentDto, ProjectWithTaskSummary } from '../../services/projectApi';
+import { useGetStudentsQuery, useGetTeachersQuery, useGetProfileQuery } from '../../services/coreApi';
 
 const STATUS_RU: Record<string, string> = {
   ACTIVE: 'Активен', COMPLETED: 'Завершён', FROZEN: 'Заморожен', CANCELLED: 'Отменён',
@@ -46,7 +47,7 @@ type TeacherTabKey = 'all' | 'active' | 'review' | 'done';
 
 type TeacherStatusKey = 'active' | 'review' | 'done' | 'delay';
 
-type HeadTabKey = 'all' | 'score' | 'rating' | 'popular';
+type HeadTabKey = 'all' | 'score';
 
 type TeacherMember = {
   initials: string;
@@ -83,28 +84,18 @@ type HeadMember = {
   role: string;
 };
 
-type HeadCriteriaItem = {
-  key: string;
-  label: string;
-  value: number;
-};
-
 type HeadProject = {
   id: string;
   typeLabel: string;
   isAwarded: boolean;
   title: string;
   description: string;
-  rating: number;
-  views: number;
-  likes: number;
-  avgScore: number;
+  progress: number;
+  tasksDone: number;
+  tasksTotal: number;
+  memberCount: number;
   curator: string;
   members: HeadMember[];
-  criteria: HeadCriteriaItem[];
-  achievements: string[];
-  awards: string[];
-  publications: number;
 };
 
 const initialsFromName = (name: string) => {
@@ -137,6 +128,7 @@ const ProjectsPage = () => {
   const userId = useAppSelector((s) => s.auth.userId) || '00000000-0000-0000-0000-000000000001';
   const userName = useAppSelector((s) => s.auth.userName) || 'Иван Иванов';
   const userRole = useAppSelector((s) => s.auth.userRole) || 'Студент';
+  const accessToken = useAppSelector((s) => s.auth.token?.accessToken);
   const isTeacher = userRole === 'Преподаватель';
   const isHead = userRole === 'Заведующий кафедрой';
   const initials = useMemo(() => initialsFromName(userName), [userName]);
@@ -145,6 +137,9 @@ const ProjectsPage = () => {
     isLoading: projectsLoading,
     refetch: refetchProjects,
   } = useGetUserProjectsQuery(userId);
+  const { data: profileData } = useGetProfileQuery(userId, { skip: !userId });
+  const departmentId = profileData?.data?.departmentId;
+  const { data: deptDashboard } = useGetDepartmentDashboardQuery(departmentId!, { skip: !departmentId || !isHead });
   const [fallbackProjects, setFallbackProjects] = useState<ProjectDto[]>([]);
   const projects = useMemo(
     () => [...(projectsResp?.data || []), ...fallbackProjects],
@@ -170,6 +165,14 @@ const ProjectsPage = () => {
   }, [projects, studentTab]);
 
   const { data: teacherMembersResp } = useGetProjectMembersQuery(
+    teacherSelectedId || '',
+    { skip: !teacherSelectedId }
+  );
+  const { data: teacherTasksResp } = useGetProjectTasksQuery(
+    teacherSelectedId || '',
+    { skip: !teacherSelectedId }
+  );
+  const { data: teacherDocsResp } = useGetProjectDocumentsQuery(
     teacherSelectedId || '',
     { skip: !teacherSelectedId }
   );
@@ -251,6 +254,25 @@ const ProjectsPage = () => {
     setTimeout(() => setUploadMsg(null), 4000);
   };
 
+  const handleDownload = async (docId: string, fileName: string) => {
+    try {
+      const resp = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/v1/documents/download/${docId}`,
+        { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} }
+      );
+      if (!resp.ok) return;
+      const blob = await resp.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch { /* ignore */ }
+  };
+
   const openCreateProject = () => {
     setIsCreateOpen(true);
   };
@@ -280,17 +302,23 @@ const ProjectsPage = () => {
       await refetchProjects();
       setSelectedProjectId(res.data.id);
       closeCreateProject();
-    } catch {
-      const local: ProjectDto = {
-        id: `local-${Date.now()}`,
-        title: body.title || 'Новый проект',
-        description: body.description || '',
-        status: 'ACTIVE',
-        endDate: body.endDate,
-      };
-      setFallbackProjects((prev) => [local, ...prev]);
-      setSelectedProjectId(local.id);
-      closeCreateProject();
+    } catch (err: any) {
+      const status = err?.status || err?.data?.code;
+      if (status === 403 || status === 'FORBIDDEN') {
+        setAddMemberError('Недостаточно прав для создания проекта');
+        closeCreateProject();
+      } else {
+        const local: ProjectDto = {
+          id: `local-${Date.now()}`,
+          title: body.title || 'Новый проект',
+          description: body.description || '',
+          status: 'ACTIVE',
+          endDate: body.endDate,
+        };
+        setFallbackProjects((prev) => [local, ...prev]);
+        setSelectedProjectId(local.id);
+        closeCreateProject();
+      }
     } finally {
       setCreating(false);
     }
@@ -366,11 +394,15 @@ const ProjectsPage = () => {
 
   const teacherProjects: TeacherProject[] = useMemo(() => {
     const base: TeacherProject[] = projects.length
-      ? projects.map((p, idx) => {
-          const typeLabel = idx % 3 === 0 ? 'Курсовой проект' : idx % 3 === 1 ? 'Научная работа' : 'Дипломный проект';
-          const tasksTotal = 0;
-          const tasksDone = 0;
-          const progress = 0;
+      ? projects.map((p) => {
+          const typeMap: Record<string, string> = {
+            DIPLOMA: 'Дипломный проект', RESEARCH: 'Научная работа',
+            COMMERCIAL_CASE: 'Коммерческий кейс', HACKATHON: 'Хакатон', OTHER: 'Курсовой проект',
+          };
+          const typeLabel = typeMap[p.templateType || ''] || 'Проект';
+          const tasksTotal = p.taskCount ?? 0;
+          const tasksDone = p.completedTaskCount ?? 0;
+          const progress = tasksTotal > 0 ? Math.round((tasksDone / tasksTotal) * 100) : 0;
           const statusRaw = (p.status || '').toUpperCase();
           const statusKey: TeacherStatusKey =
             statusRaw.includes('DONE') || statusRaw.includes('COMPLET') ? 'done' : statusRaw.includes('REVIEW') ? 'review' : 'active';
@@ -402,41 +434,51 @@ const ProjectsPage = () => {
     return base;
   }, [projects]);
 
-  const headProjects = useMemo<HeadProject[]>(
-    () =>
-      projects.map((p, idx) => ({
+  const PROJECT_TYPE_LABELS: Record<string, string> = {
+    DIPLOMA: 'Дипломный проект', VKR: 'ВКР', COURSEWORK: 'Курсовой проект', RESEARCH: 'Научная работа',
+  };
+
+  const headProjects = useMemo<HeadProject[]>(() => {
+    const deptProjects = deptDashboard?.data?.projects || [];
+    const teacherList = allTeachers?.data || [];
+    return deptProjects.map((p: ProjectWithTaskSummary) => {
+      const progress = p.tasksTotal > 0 ? Math.round((p.tasksDone / p.tasksTotal) * 100) : 0;
+      const curatorUser = p.createdBy ? teacherList.find((t) => t.id === p.createdBy) : undefined;
+      const curatorName = curatorUser ? `${curatorUser.firstName || ''} ${curatorUser.lastName || ''}`.trim() : '—';
+      return {
         id: p.id,
-        typeLabel: idx % 3 === 0 ? 'Дипломный проект' : idx % 3 === 1 ? 'ВКР' : 'Курсовой проект',
+        typeLabel: PROJECT_TYPE_LABELS[p.projectType || ''] || 'Проект',
         isAwarded: false,
         title: p.title,
         description: p.description || '—',
-        rating: 0,
-        views: 0,
-        likes: 0,
-        avgScore: 0,
-        curator: '—',
-        members: [],
-        criteria: [],
-        achievements: [],
-        awards: [],
-        publications: 0,
-      })),
-    [projects]
-  );
+        progress,
+        tasksDone: p.tasksDone,
+        tasksTotal: p.tasksTotal,
+        memberCount: p.memberCount,
+        curator: curatorName,
+        members: (p.members || []).map((m) => ({
+          initials: `${(m.firstName || '')[0] || ''}${(m.lastName || '')[0] || ''}`.toUpperCase() || 'ИИ',
+          name: `${m.firstName || ''} ${m.lastName || ''}`.trim() || '—',
+          role: '',
+        })),
+      };
+    });
+  }, [deptDashboard, allTeachers]);
 
   const headStats = useMemo(() => {
-    const topCount = headProjects.length;
-    const awardedCount = headProjects.filter((p) => p.isAwarded || p.awards.length).length;
-    const publications = headProjects.reduce((sum, p) => sum + p.publications, 0);
-    const avg = topCount ? headProjects.reduce((sum, p) => sum + p.avgScore, 0) / topCount : 0;
-    return { topCount, awardedCount, publications, avgScore: avg };
-  }, [headProjects]);
+    const dd = deptDashboard?.data;
+    const topCount = dd?.totalProjects ?? headProjects.length;
+    const activeCount = dd?.activeProjects ?? 0;
+    const completedCount = dd?.completedProjects ?? 0;
+    const avgProgress = headProjects.length
+      ? Math.round(headProjects.reduce((sum, p) => sum + p.progress, 0) / headProjects.length)
+      : 0;
+    return { topCount, activeCount, completedCount, avgProgress };
+  }, [headProjects, deptDashboard]);
 
   const headList = useMemo(() => {
     const copy = [...headProjects];
-    if (headTab === 'score') return copy.sort((a, b) => b.avgScore - a.avgScore);
-    if (headTab === 'rating') return copy.sort((a, b) => b.rating - a.rating);
-    if (headTab === 'popular') return copy.sort((a, b) => b.views - a.views);
+    if (headTab === 'score') return copy.sort((a, b) => b.progress - a.progress);
     return copy;
   }, [headProjects, headTab]);
 
@@ -524,7 +566,7 @@ const ProjectsPage = () => {
                   <div className={styles.headStats}>
                     <div className={styles.headStatCard}>
                       <div>
-                        <div className={styles.headStatLabel}>Топ проектов</div>
+                        <div className={styles.headStatLabel}>Всего проектов</div>
                         <div className={styles.headStatValue}>{headStats.topCount}</div>
                       </div>
                       <div className={`${styles.headStatIconWrap} ${styles.headStatIconYellow}`}>
@@ -533,8 +575,8 @@ const ProjectsPage = () => {
                     </div>
                     <div className={styles.headStatCard}>
                       <div>
-                        <div className={styles.headStatLabel}>С наградами</div>
-                        <div className={styles.headStatValue}>{headStats.awardedCount}</div>
+                        <div className={styles.headStatLabel}>Активных</div>
+                        <div className={styles.headStatValue}>{headStats.activeCount}</div>
                       </div>
                       <div className={`${styles.headStatIconWrap} ${styles.headStatIconPurple}`}>
                         <img src={AwardIcon} className={styles.headStatIcon} />
@@ -542,8 +584,8 @@ const ProjectsPage = () => {
                     </div>
                     <div className={styles.headStatCard}>
                       <div>
-                        <div className={styles.headStatLabel}>Публикации</div>
-                        <div className={styles.headStatValue}>{headStats.publications}</div>
+                        <div className={styles.headStatLabel}>Завершённых</div>
+                        <div className={styles.headStatValue}>{headStats.completedCount}</div>
                       </div>
                       <div className={`${styles.headStatIconWrap} ${styles.headStatIconBlue}`}>
                         <img src={FileIcon} className={styles.headStatIcon} />
@@ -551,8 +593,8 @@ const ProjectsPage = () => {
                     </div>
                     <div className={styles.headStatCard}>
                       <div>
-                        <div className={styles.headStatLabel}>Средняя оценка</div>
-                        <div className={styles.headStatValueGreen}>{headStats.avgScore.toFixed(1)}</div>
+                        <div className={styles.headStatLabel}>Средний прогресс</div>
+                        <div className={styles.headStatValueGreen}>{headStats.avgProgress}%</div>
                       </div>
                       <div className={`${styles.headStatIconWrap} ${styles.headStatIconGreen}`}>
                         <HeadTrendIcon className={styles.headStatIcon} />
@@ -565,13 +607,7 @@ const ProjectsPage = () => {
                       Все проекты
                     </button>
                     <button type="button" className={headTab === 'score' ? styles.headTabActive : styles.headTab} onClick={() => setHeadTab('score')}>
-                      По оценке
-                    </button>
-                    <button type="button" className={headTab === 'rating' ? styles.headTabActive : styles.headTab} onClick={() => setHeadTab('rating')}>
-                      По рейтингу
-                    </button>
-                    <button type="button" className={headTab === 'popular' ? styles.headTabActive : styles.headTab} onClick={() => setHeadTab('popular')}>
-                      Популярные
+                      По прогрессу
                     </button>
                   </div>
 
@@ -635,10 +671,12 @@ const ProjectsPage = () => {
                       onClose={closeTeacherModal}
                       onSendComment={sendTeacherComment}
                       members={(teacherMembersResp?.data || []).map((m) => ({
-                        initials: m.userId.replace(/-/g, '').slice(0, 2).toUpperCase(),
-                        name: m.role === 'LEADER' ? `Руководитель (${m.userId.slice(0, 8)})` : `Участник (${m.userId.slice(0, 8)})`,
-                        role: m.role === 'LEADER' ? 'Team Lead' : 'Member',
+                        initials: (m.userName || '').split(' ').map((w: string) => w[0] || '').join('').toUpperCase() || m.userId.replace(/-/g, '').slice(0, 2).toUpperCase(),
+                        name: m.userName || m.userId.slice(0, 8),
+                        role: m.role === 'LEADER' ? 'Руководитель' : m.role === 'MENTOR' ? 'Наставник' : m.role === 'OBSERVER' ? 'Наблюдатель' : 'Участник',
                       }))}
+                      tasks={teacherTasksResp?.data || []}
+                      documents={teacherDocsResp?.data || []}
                     />
                   )}
                 </>
@@ -668,10 +706,12 @@ const ProjectsPage = () => {
                         <p className={styles.a14}>Архив</p>
                       </button>
                     </div>
-                    <div className={styles.button9} onClick={openCreateProject}>
-                      <img src={AddIcon} className={styles.icon4} />
-                      <p className={styles.a15}>Создать проект</p>
-                    </div>
+                    {(isTeacher || isHead) && (
+                      <div className={styles.button9} onClick={openCreateProject}>
+                        <img src={AddIcon} className={styles.icon4} />
+                        <p className={styles.a15}>Создать проект</p>
+                      </div>
+                    )}
                   </div>
 
                   <div className={styles.container29}>
@@ -837,7 +877,9 @@ const ProjectsPage = () => {
                         <div style={{ marginTop: 20, padding: '16px 0', borderTop: '1px solid #f1f5f9' }}>
                           <p className={styles.a19} style={{ marginBottom: 10 }}>Участники проекта ({studentMembers.length})</p>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
-                            {studentMembers.map((m) => {
+                            {(() => {
+                              const isCurrentUserLeader = studentMembers.some(m => m.userId === userId && m.role === 'LEADER');
+                              return studentMembers.map((m) => {
                               const name = m.userName || m.userId.slice(0, 8) + '...';
                               const roleLabel = m.role === 'LEADER' ? 'Руководитель' : m.role === 'MENTOR' ? 'Наставник' : m.role === 'OBSERVER' ? 'Наблюдатель' : 'Участник';
                               const isMe = m.userId === userId;
@@ -847,7 +889,7 @@ const ProjectsPage = () => {
                                     <span style={{ fontWeight: 600, color: '#0e1d45' }}>{name}{isMe ? ' (Вы)' : ''}</span>
                                     <span style={{ fontSize: 11, color: '#64748b', padding: '2px 6px', background: '#e2e8f0', borderRadius: 4 }}>{roleLabel}</span>
                                   </div>
-                                  {m.role !== 'LEADER' && m.userId !== userId && (
+                                  {isCurrentUserLeader && m.role !== 'LEADER' && m.userId !== userId && (
                                     <button
                                       style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 16, padding: '0 4px' }}
                                       title="Удалить участника"
@@ -856,7 +898,8 @@ const ProjectsPage = () => {
                                   )}
                                 </div>
                               );
-                            })}
+                            });
+                            })()}
                           </div>
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                             <input
@@ -915,14 +958,11 @@ const ProjectsPage = () => {
                                     </div>
                                   </div>
                                   <div style={{ display: 'flex', gap: 8 }}>
-                                    <a
-                                      href={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api/v1/documents/download/${d.id}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      style={{ cursor: 'pointer' }}
-                                    >
-                                      <img src={DownloadIcon} style={{ width: 18, height: 18 }} />
-                                    </a>
+                                    <img
+                                      src={DownloadIcon}
+                                      style={{ width: 18, height: 18, cursor: 'pointer' }}
+                                      onClick={() => handleDownload(d.id, d.filePath?.split('/').pop()?.replace(/^[a-f0-9-]+_/, '') || d.description || 'document')}
+                                    />
                                     <img
                                       src={CloseIcon}
                                       style={{ width: 18, height: 18, cursor: 'pointer', opacity: 0.5 }}
@@ -976,16 +1016,11 @@ const HeadProjectCard = ({ project, onOpen }: { project: HeadProject; onOpen: ()
           <div className={styles.headCardChips}>
             <span className={styles.headChip}>{project.typeLabel}</span>
             <span className={styles.headMetaPill}>
-              <HeadStarIcon className={styles.headMetaIcon} />
-              {project.rating.toFixed(1)}
+              <img src={PeopleIcon} className={styles.headMetaImgIcon} />
+              {project.memberCount}
             </span>
             <span className={styles.headMetaPill}>
-              <img src={EyeIcon} className={styles.headMetaImgIcon} />
-              {project.views}
-            </span>
-            <span className={styles.headMetaPill}>
-              <HeadThumbIcon className={styles.headMetaIcon} />
-              {project.likes}
+              {project.tasksDone}/{project.tasksTotal} задач
             </span>
           </div>
         </div>
@@ -1001,11 +1036,11 @@ const HeadProjectCard = ({ project, onOpen }: { project: HeadProject; onOpen: ()
         </div>
 
         <div className={styles.headScoreRow}>
-          <div className={styles.headScoreLabel}>Общая оценка</div>
-          <div className={styles.headScoreValue}>{project.avgScore}/100</div>
+          <div className={styles.headScoreLabel}>Прогресс</div>
+          <div className={styles.headScoreValue}>{project.progress}%</div>
         </div>
         <div className={styles.headScoreBar}>
-          <div className={styles.headScoreFill} style={{ width: `${clamp(project.avgScore, 0, 100)}%` }} />
+          <div className={styles.headScoreFill} style={{ width: `${clamp(project.progress, 0, 100)}%` }} />
         </div>
       </div>
     </div>
@@ -1063,61 +1098,35 @@ const HeadProjectModal = ({ project, onClose }: { project: HeadProject; onClose:
 
         <div className={styles.headLeaderLine}>Научный руководитель: {project.curator}</div>
 
-        <div className={styles.headSectionTitle}>Оценки по критериям</div>
+        <div className={styles.headSectionTitle}>Прогресс</div>
         <div className={styles.headCriteria}>
-          {project.criteria.map((c) => (
-            <div key={c.key} className={styles.headCriteriaRow}>
-              <div className={styles.headCriteriaTop}>
-                <div className={styles.headCriteriaLabel}>{c.label}</div>
-                <div className={styles.headCriteriaValue}>{clamp(c.value, 0, 100)}/100</div>
-              </div>
-              <div className={styles.headCriteriaBar}>
-                <div className={styles.headCriteriaFill} style={{ width: `${clamp(c.value, 0, 100)}%` }} />
-              </div>
+          <div className={styles.headCriteriaRow}>
+            <div className={styles.headCriteriaTop}>
+              <div className={styles.headCriteriaLabel}>Выполнение задач</div>
+              <div className={styles.headCriteriaValue}>{project.tasksDone}/{project.tasksTotal}</div>
             </div>
-          ))}
+            <div className={styles.headCriteriaBar}>
+              <div className={styles.headCriteriaFill} style={{ width: `${clamp(project.progress, 0, 100)}%` }} />
+            </div>
+          </div>
         </div>
-
-        <div className={styles.headSectionTitle}>Достижения</div>
-        <div className={styles.headAchievements}>
-          {project.achievements.map((a) => (
-            <div key={a} className={styles.headAchievementRow}>
-              <img src={AwardIcon} className={styles.headAchievementIcon} />
-              <div className={styles.headAchievementText}>{a}</div>
-            </div>
-          ))}
-        </div>
-
-        {(project.awards.length || project.isAwarded) && (
-          <>
-            <div className={styles.headSectionTitle}>Награды</div>
-            <div className={styles.headAwardsRow}>
-              {project.awards.map((a) => (
-                <span key={a} className={styles.headAwardChip}>
-                  <img src={AwardIcon} className={styles.headAwardChipIcon} />
-                  {a}
-                </span>
-              ))}
-            </div>
-          </>
-        )}
 
         <div className={styles.headBottomKpis}>
           <div className={styles.headKpiCard}>
-            <div className={styles.headKpiValueBlue}>{project.avgScore}</div>
-            <div className={styles.headKpiLabel}>Оценка</div>
+            <div className={styles.headKpiValueBlue}>{project.progress}%</div>
+            <div className={styles.headKpiLabel}>Прогресс</div>
           </div>
           <div className={styles.headKpiCard}>
-            <div className={styles.headKpiValueOrange}>{project.rating.toFixed(1)}</div>
-            <div className={styles.headKpiLabel}>Рейтинг</div>
+            <div className={styles.headKpiValueOrange}>{project.tasksDone}</div>
+            <div className={styles.headKpiLabel}>Задач выполнено</div>
           </div>
           <div className={styles.headKpiCard}>
-            <div className={styles.headKpiValueBlue}>{project.views}</div>
-            <div className={styles.headKpiLabel}>Просмотры</div>
+            <div className={styles.headKpiValueBlue}>{project.tasksTotal}</div>
+            <div className={styles.headKpiLabel}>Всего задач</div>
           </div>
           <div className={styles.headKpiCard}>
-            <div className={styles.headKpiValueGreen}>{project.likes}</div>
-            <div className={styles.headKpiLabel}>Лайки</div>
+            <div className={styles.headKpiValueGreen}>{project.memberCount}</div>
+            <div className={styles.headKpiLabel}>Участников</div>
           </div>
         </div>
       </div>
@@ -1135,20 +1144,6 @@ const HeadTrendIcon = ({ className }: { className?: string }) => (
       strokeLinejoin="round"
     />
     <path d="M16.5 7.5H20V11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-const HeadStarIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 2.75l2.88 5.83 6.44.94-4.66 4.54 1.1 6.41L12 17.92l-5.76 3.03 1.1-6.41-4.66-4.54 6.44-.94L12 2.75z" />
-  </svg>
-);
-
-const HeadThumbIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-    <path d="M9 10V21H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h4z" />
-    <path d="M10 10h6.3c.6 0 1.16.27 1.54.73.38.46.55 1.06.45 1.65l-1.2 7A2 2 0 0 1 15.12 21H10V10z" />
-    <path d="M10 10l2.2-6.1A2 2 0 0 1 14.1 2h.4c.83 0 1.5.67 1.5 1.5V10H10z" />
   </svg>
 );
 
@@ -1211,6 +1206,8 @@ const TeacherProjectModal = ({
   onClose,
   onSendComment,
   members,
+  tasks,
+  documents,
 }: {
   project: TeacherProject | null;
   commentDraft: string;
@@ -1218,6 +1215,8 @@ const TeacherProjectModal = ({
   onClose: () => void;
   onSendComment: () => void;
   members?: TeacherMember[];
+  tasks?: TaskDto[];
+  documents?: DocumentDto[];
 }) => {
   if (!project) return null;
   const displayMembers = members && members.length > 0 ? members : project.members;
@@ -1293,18 +1292,38 @@ const TeacherProjectModal = ({
           </div>
         </div>
 
-        <div className={styles.teacherSectionTitle}>Этапы проекта</div>
+        <div className={styles.teacherSectionTitle}>Задачи проекта ({tasks?.length || 0})</div>
         <div className={styles.teacherStages}>
-          {project.stages.map((s) => (
-            <div key={`${s.title}-${s.date}`} className={styles.teacherStageRow}>
-              <div className={s.done ? styles.teacherStageDotDone : styles.teacherStageDotTodo}>
-                {s.done ? '✓' : '!'}
+          {(!tasks || tasks.length === 0) && <p style={{ color: '#94a3b8', fontSize: 13 }}>Нет задач</p>}
+          {tasks?.map((t) => {
+            const done = t.status === 'DONE';
+            const statusLabel = t.status === 'TO_DO' ? 'К выполнению' : t.status === 'IN_PROGRESS' ? 'В работе' : t.status === 'REVIEW' ? 'На проверке' : t.status === 'DONE' ? 'Выполнена' : 'Заблокирована';
+            return (
+              <div key={t.id} className={styles.teacherStageRow}>
+                <div className={done ? styles.teacherStageDotDone : styles.teacherStageDotTodo}>
+                  {done ? '✓' : '○'}
+                </div>
+                <div className={styles.teacherStageTitle}>{t.title}</div>
+                <div className={styles.teacherStageDate}>{statusLabel}</div>
               </div>
-              <div className={styles.teacherStageTitle}>{s.title}</div>
-              <div className={styles.teacherStageDate}>{s.date}</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
+
+        {documents && documents.length > 0 && (
+          <>
+            <div className={styles.teacherSectionTitle}>Документы ({documents.length})</div>
+            <div className={styles.teacherStages}>
+              {documents.map((d) => (
+                <div key={d.id} className={styles.teacherStageRow}>
+                  <div className={styles.teacherStageDotDone}>📄</div>
+                  <div className={styles.teacherStageTitle}>{d.description || d.filePath}</div>
+                  <div className={styles.teacherStageDate}>{d.createdAt ? new Date(d.createdAt).toLocaleDateString('ru-RU') : ''}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         <div className={styles.teacherSectionTitle}>Комментарий преподавателя</div>
         <textarea

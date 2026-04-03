@@ -7,7 +7,7 @@ import EyeIcon from '../../assets/icons/ui-eye.svg';
 import ChatIcon from '../../assets/icons/ui-chat.svg';
 import Sidebar from '../../components/Sidebar';
 import { useAppSelector } from '../../app/hooks';
-import { useGetDashboardSummaryQuery } from '../../services/coreApi';
+import { useGetDashboardSummaryQuery, useGetProfileQuery } from '../../services/coreApi';
 import type { KpiItem, ActivityItem, StudentItem, AttentionProject, SimpleKpi, PieSlice, ActivityLogItem, SubjectItem, GroupPerformance } from '../../services/coreApi';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -443,7 +443,9 @@ const HeadAnalyticsView = ({ avatarInitials }: { avatarInitials: string }) => {
   const [tab, setTab] = useState<HeadAnalyticsTabKey>('performance');
   const userId = useAppSelector((s) => s.auth.userId);
   const { data: dashboardData } = useGetDashboardSummaryQuery(userId ?? '', { skip: !userId });
+  const { data: profileData } = useGetProfileQuery(userId ?? '', { skip: !userId });
   const d = dashboardData?.success ? dashboardData.data : undefined;
+  const departmentName = profileData?.data?.departmentName || 'Кафедра';
 
   return (
     <div className={styles.page}>
@@ -453,7 +455,7 @@ const HeadAnalyticsView = ({ avatarInitials }: { avatarInitials: string }) => {
           <div className={styles.topbar}>
             <div className={styles.titleWrap}>
               <div className={styles.title}>Аналитика</div>
-              <div className={styles.subtitle}>Кафедра программной инженерии</div>
+              <div className={styles.subtitle}>{departmentName}</div>
             </div>
             <div className={styles.topActions}>
               <div className={styles.notif}>

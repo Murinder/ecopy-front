@@ -140,10 +140,25 @@ const labelToBackendType: Record<LessonType, string> = {
   'Лекция': 'LECTURE', 'Семинар': 'SEMINAR', 'Практика': 'PRACTICE',
 };
 
+const mapTimeToSlotKey = (time: string): string => {
+  const slotRanges = [
+    { start: '08:00', end: '09:30', key: '08:00-09:30' },
+    { start: '10:00', end: '11:30', key: '10:00-11:30' },
+    { start: '12:00', end: '13:30', key: '12:00-13:30' },
+    { start: '14:00', end: '15:30', key: '14:00-15:30' },
+    { start: '16:00', end: '17:30', key: '16:00-17:30' },
+    { start: '18:00', end: '19:30', key: '18:00-19:30' },
+  ];
+  for (const slot of slotRanges) {
+    if (time >= slot.start && time <= slot.end) return slot.key;
+  }
+  return time;
+};
+
 const mapApiLessonToLocal = (dto: LessonDto): Lesson => ({
   id: dto.id,
   day: backendDayToWeekday[dto.dayOfWeek] || 'MON',
-  slotKey: dto.timeSlot,
+  slotKey: mapTimeToSlotKey(dto.timeSlot),
   subject: dto.subject,
   type: backendTypeToLabel[dto.lessonType] || 'Лекция',
   group: dto.groupName || '',
@@ -243,7 +258,7 @@ const TeacherScheduleView = ({ avatarInitials, userId }: { avatarInitials: strin
       await createLessonApi({
         userId,
         dayOfWeek: weekdayToBackendDay[dayDraft],
-        timeSlot: slotDraft,
+        timeSlot: slotDraft.split('-')[0],
         subject,
         lessonType: labelToBackendType[typeDraft],
         groupName: group,
