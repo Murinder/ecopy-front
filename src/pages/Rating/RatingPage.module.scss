@@ -7,7 +7,7 @@
   width: 100vw;
   min-height: 100vh;
   background: #f9fafb;
-  color: #0a0a0a;
+  color: #1B2559;
 }
 
 .content {
@@ -34,15 +34,14 @@
 }
 
 .title {
-  color: #0e1d45;
-  font-family: Inter, Arial, Helvetica, sans-serif;
-  font-size: 36px;
+  color: #1B2559;
+  font-size: 28px;
   font-weight: 700;
-  line-height: 40px;
+  line-height: 1.3;
 }
 
 .subtitle {
-  color: #6a7282;
+  color: #A3AED0;
   font-size: 14px;
   line-height: 20px;
 }
@@ -55,39 +54,21 @@
 
 .notif {
   position: relative;
-  border-radius: 7px;
-  width: 36px;
-  height: 36px;
+  border-radius: 12px;
+  width: 40px;
+  height: 40px;
   background: #f5f5f5;
-}
-.notifIcon {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  width: 16px;
-  height: 16px;
-}
-.notifBadge {
   display: flex;
-  position: absolute;
-  top: -4px;
-  left: 20px;
   align-items: center;
   justify-content: center;
-  border-radius: 7px;
-  background: #fb2c36;
-  width: 20px;
-  height: 20px;
-  color: #ffffff;
-  font-size: 12px;
-  font-weight: 600;
 }
+
 .avatar {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 9999px;
-  background: #3a76f0;
+  border-radius: var(--radius-full);
+  background: var(--accent-primary);
   width: 32px;
   height: 32px;
   color: #ffffff;
@@ -98,36 +79,43 @@
 .main {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 24px 32px;
+  gap: 24px;
+  padding: 32px;
   width: 100%;
 }
 
+/* ── Hero ── */
 .hero {
   display: grid;
   grid-template-columns: 180px 1fr;
-  gap: 16px;
+  gap: 24px;
   align-items: center;
-  border-radius: 16px;
-  padding: 18px 20px;
+  border-radius: var(--radius-lg);
+  padding: 24px;
   color: #ffffff;
-  background: linear-gradient(180deg, #3a76f0 0%, #0e1d45 100%);
-  box-shadow: 0 10px 15px -3px #0000001a, 0 4px 6px -4px #0000001a;
+  background: linear-gradient(135deg, #3a76f0 0%, #0e1d45 100%);
+  box-shadow: var(--shadow-card);
 }
 
 .ringWrap {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  position: relative;
 }
 
 .ring {
-  width: 120px;
-  height: 120px;
+  width: 140px;
+  height: 140px;
 }
 
 .ringText {
   position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -136,65 +124,86 @@
 }
 
 .ringValue {
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 24px;
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1;
 }
+
 .ringSub {
-  opacity: 0.9;
+  opacity: 0.85;
   font-size: 12px;
 }
 
+.levelLabel {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #05CD99;
+}
+
 .heroTitle {
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 700;
 }
+
 .heroDesc {
   margin-top: 4px;
   color: #dbeafe;
-  font-size: 13px;
-  line-height: 18px;
+  font-size: 14px;
+  line-height: 20px;
 }
 
 .heroStats {
   display: grid;
   grid-template-columns: repeat(3, minmax(120px, 1fr));
-  gap: 12px;
-  margin-top: 12px;
+  gap: 16px;
+  margin-top: 16px;
 }
+
 .heroStatLabel {
   color: #bedbff;
   font-size: 12px;
 }
+
 .heroStatValue {
   margin-top: 2px;
-  font-weight: 800;
+  font-weight: 700;
+  font-size: 16px;
 }
+
 .statusPill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
   background: #facc15;
   color: #0a0a0a;
   padding: 4px 10px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
+/* ── Grids ── */
 .grid3 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  gap: 24px;
 }
 
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+/* ── Card ── */
 .card {
-  border: 1px solid #e5e5e5;
-  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-lg);
   background: #ffffff;
-  padding: 16px;
-  box-shadow: 0 10px 15px -3px #0000001a, 0 4px 6px -4px #0000001a;
+  padding: 24px;
+  box-shadow: var(--shadow-light-card);
 }
 
 .cardHead {
@@ -204,39 +213,55 @@
   gap: 12px;
 }
 
+.cardTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1B2559;
+}
+
+.cardSub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #A3AED0;
+}
+
+.cardScoreLabel {
+  color: #A3AED0;
+  font-size: 12px;
+}
+
+/* ── Metric cards ── */
 .metricIcon {
   width: 40px;
   height: 40px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f5f5f5;
 }
+
 .metricIconBlue {
   background: #dbeafe;
 }
+
 .metricIconOrange {
   background: #ffedd5;
 }
+
 .metricIconPurple {
   background: #f3e8ff;
 }
+
 .metricTitle {
-  margin-top: 10px;
+  margin-top: 12px;
   font-size: 14px;
   font-weight: 700;
-  color: #0a0a0a;
+  color: #1B2559;
 }
-.metricScore {
-  margin-top: 2px;
-  font-size: 18px;
-  font-weight: 800;
-  color: #0a0a0a;
-}
+
 .metricHint {
   margin-top: 4px;
-  color: #6a7282;
+  color: #A3AED0;
   font-size: 12px;
   line-height: 16px;
 }
@@ -252,201 +277,209 @@
 .metricBarFill {
   height: 100%;
   border-radius: 3px;
-  background: #6366f1;
+  background: var(--accent-secondary);
   transition: width 0.4s ease;
 }
 
-.divider {
-  margin: 12px 0;
-  height: 6px;
-  background: #e5e5e5;
-  border-radius: 9999px;
-  overflow: hidden;
-}
-.dividerInner {
-  height: 100%;
-  background: #0a0a0a;
-  width: 60%;
+/* ── Chart container ── */
+.chartContainer {
+  margin-top: 16px;
+  width: 100%;
+  height: 280px;
 }
 
-.kvList {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px 12px;
-  color: #4a5565;
-  font-size: 12px;
-}
-.kvValue {
-  color: #0a0a0a;
-  font-weight: 700;
-}
-
-.grid2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.cardTitle {
-  font-size: 16px;
-  font-weight: 800;
-  color: #0a0a0a;
-}
-.cardSub {
-  margin-top: 2px;
-  font-size: 12px;
-  color: #6a7282;
-}
-
-.chartBox {
-  margin-top: 10px;
-  border: 1px dashed #e5e5e5;
-  border-radius: 12px;
-  height: 220px;
-  padding: 8px;
-}
-
+/* ── Legend ── */
 .legendRow {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  margin-top: 8px;
-  color: #6a7282;
+  gap: 16px;
+  margin-top: 12px;
+  color: #A3AED0;
   font-size: 12px;
 }
+
 .legendItem {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
+
 .dot {
   width: 10px;
   height: 10px;
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
 }
 
+/* ── Achievements ── */
 .achGrid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 12px;
-  margin-top: 10px;
+  margin-top: 16px;
 }
+
 .achCard {
   display: grid;
   grid-template-columns: 40px 1fr;
-  gap: 10px;
-  border: 1px solid #e5e5e5;
-  border-radius: 12px;
-  padding: 10px;
+  gap: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-md);
+  background: #f9fafb;
+  padding: 12px;
 }
+
 .achCardActive {
-  border-color: #3a76f0;
-  box-shadow: 0 10px 15px -3px #0000001a, 0 4px 6px -4px #0000001a;
+  border-color: var(--accent-primary);
+  box-shadow: var(--shadow-light-card);
 }
+
 .achIcon {
   width: 40px;
   height: 40px;
-  border-radius: 12px;
-  background: #f5f5f5;
+  border-radius: var(--radius-md);
+  background: #f0f0f5;
   display: flex;
   align-items: center;
   justify-content: center;
 }
+
 .achName {
-  font-weight: 800;
+  font-weight: 700;
   font-size: 14px;
+  color: #1B2559;
 }
+
 .achDesc {
-  color: #6a7282;
+  color: #A3AED0;
   font-size: 12px;
   margin-top: 2px;
 }
+
 .achMeta {
-  color: #3a76f0;
+  color: var(--accent-primary);
   font-size: 11px;
   margin-top: 4px;
 }
-.locked {
-  opacity: 0.45;
-}
 
+/* ── Leaderboard ── */
 .leaders {
-  margin-top: 10px;
+  margin-top: 12px;
   display: flex;
   flex-direction: column;
+  gap: 8px;
+}
+
+.tableHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #A3AED0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.tableHeaderLeft {
+  display: flex;
+  align-items: center;
   gap: 10px;
 }
+
 .leaderRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  border-radius: 12px;
-  padding: 10px;
-  border: 1px solid #e5e5e5;
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: #f3f4f6;
+  }
 }
+
 .leaderLeft {
   display: flex;
   align-items: center;
   gap: 10px;
 }
+
 .rank {
   width: 28px;
   height: 28px;
-  border-radius: 9999px;
+  border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
+  font-weight: 700;
   font-size: 12px;
+  color: #0a0a0a;
 }
+
 .rank1 {
   background: #facc15;
 }
+
 .rank2 {
-  background: #e5e7eb;
+  background: #d1d5db;
 }
+
 .rank3 {
   background: #fb923c;
-  color: #0a0a0a;
 }
+
+.rankDefault {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
 .leaderAvatar {
   width: 30px;
   height: 30px;
-  border-radius: 9999px;
-  background: #3a76f0;
+  border-radius: var(--radius-full);
+  background: var(--accent-primary);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
+  font-weight: 700;
   font-size: 12px;
 }
+
 .leaderName {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
+  color: #1B2559;
 }
+
 .leaderScore {
   font-size: 13px;
-  font-weight: 800;
-  color: #0a0a0a;
+  font-weight: 700;
+  color: #1B2559;
 }
+
 .youRow {
-  border-color: #3a76f0;
+  border-color: var(--accent-primary);
   background: #eff6ff;
 }
 
+/* ── States ── */
 .loading,
 .error {
   text-align: center;
   padding: 24px;
   font-size: 14px;
-  color: #6a7282;
+  color: #A3AED0;
 }
+
 .error {
-  color: #ef4444;
+  color: var(--status-error);
 }
+
 .empty {
   text-align: center;
   padding: 16px;
@@ -454,6 +487,7 @@
   color: #9ca3af;
 }
 
+/* ── Responsive ── */
 @media (max-width: 1024px) {
   .grid3 {
     grid-template-columns: 1fr;
@@ -463,7 +497,11 @@
   }
   .hero {
     grid-template-columns: 1fr;
-    justify-items: start;
+    justify-items: center;
+    text-align: center;
+  }
+  .heroStats {
+    justify-items: center;
   }
 }
 
@@ -478,6 +516,9 @@
     padding: 16px;
   }
   .heroStats {
+    grid-template-columns: 1fr;
+  }
+  .achGrid {
     grid-template-columns: 1fr;
   }
 }

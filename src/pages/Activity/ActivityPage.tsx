@@ -384,7 +384,7 @@ const StudentActivityView = ({ avatarInitials }: { avatarInitials: string }) => 
                     {d.activities.map((a: ActivityLogItem, i: number) => (
                       <div key={i} className={styles.listItem}>
                         <div>
-                          <div style={{ fontWeight: 600, color: '#0a0a0a' }}>{a.user}</div>
+                          <div style={{ fontWeight: 600, color: '#1B2559' }}>{a.user}</div>
                           <div style={{ fontSize: 13, color: '#6a7282' }}>{a.action}</div>
                         </div>
                         <div style={{ textAlign: 'right' }}>

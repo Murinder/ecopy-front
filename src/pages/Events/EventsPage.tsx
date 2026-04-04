@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import styles from './EventsPage.module.scss';
 import Sidebar from '../../components/Sidebar';
 import BellIcon from '../../assets/icons/mjbmqg4r-fcbhx7k.svg';
@@ -211,7 +212,7 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
     const y = teacherViewDate.getFullYear();
     const m = teacherViewDate.getMonth();
     const first = new Date(y, m, 1);
-    const startOffset = first.getDay();
+    const startOffset = (first.getDay() + 6) % 7; // Monday=0
     const daysInMonth = new Date(y, m + 1, 0).getDate();
 
     const cells: Array<{ day: number | null }> = [];
@@ -369,7 +370,7 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
               <div className={styles.teacherCalendarCard}>
                 <div className={styles.teacherCardTitle}>Календарь мероприятий</div>
                 <div className={styles.teacherWeekdays}>
-                  {['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'].map((d) => (
+                  {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d) => (
                     <div key={d} className={styles.teacherWeekday}>
                       {d}
                     </div>
@@ -927,262 +928,222 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                 })}
               </div>
             ) : (
-              <div className={styles.grid}>
-                {!studentEventsLoading && !studentEventsError && list.length === 0 && <p className={styles.empty}>Нет данных</p>}
-                {list.map((e, idx) => {
-                  const existingApp = myApplicationByEventId[e.id];
-                  const placeClass = idx === 0 ? styles.fullLeft : idx === 1 ? styles.fullRight : styles.halfLeft;
-                  return (
-                    <div
-                      key={e.id}
-                      className={`${styles.card} ${placeClass}`}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setSelectedId(e.id)}
-                      onKeyDown={(ev) => {
-                        if (ev.key === 'Enter' || ev.key === ' ') setSelectedId(e.id);
-                      }}
-                    >
-                      <div className={styles.cardTop}>
-                        <div className={pillClass(e.tag)}>{e.tag}</div>
-                        {tab === 'upcoming' ? (
-                          existingApp ? (
-                            <div className={`${styles.pill} ${styles[STATUS_STYLES[existingApp.status] ?? 'statusPending']}`}>
-                              {STATUS_LABELS[existingApp.status] ?? existingApp.status}
-                            </div>
+              <div className={styles.listPanelLayout}>
+                <div className={styles.eventList}>
+                  {!studentEventsLoading && !studentEventsError && list.length === 0 && <p className={styles.empty}>Нет данных</p>}
+                  {list.map((e) => {
+                    const existingApp = myApplicationByEventId[e.id];
+                    const iconClass = e.tag === 'Хакатон' ? styles.iconHackathon : e.tag === 'Карьера' ? styles.iconCareer : styles.iconEducation;
+                    const iconEmoji = e.tag === 'Хакатон' ? '🏆' : e.tag === 'Карьера' ? '💼' : '📚';
+                    const isActive = selectedId === e.id;
+                    return (
+                      <div
+                        key={e.id}
+                        className={`${styles.eventListItem} ${isActive ? styles.eventListItemActive : ''}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setSelectedId(e.id)}
+                        onKeyDown={(ev) => {
+                          if (ev.key === 'Enter' || ev.key === ' ') setSelectedId(e.id);
+                        }}
+                      >
+                        <div className={`${styles.eventListIcon} ${iconClass}`}>{iconEmoji}</div>
+                        <div className={styles.eventListBody}>
+                          <div className={styles.eventListTitle}>{e.title}</div>
+                          <div className={styles.eventListDate}>{e.date} · {e.time}</div>
+                        </div>
+                        <div className={styles.eventListRight}>
+                          <div className={pillClass(e.tag)}>{e.tag}</div>
+                          {tab === 'upcoming' ? (
+                            existingApp ? (
+                              <div className={`${styles.pill} ${styles[STATUS_STYLES[existingApp.status] ?? 'statusPending']}`}>
+                                {STATUS_LABELS[existingApp.status] ?? existingApp.status}
+                              </div>
+                            ) : (
+                              <div className={`${styles.pill} ${styles.statusAction}`}>Регистрация</div>
+                            )
                           ) : (
-                            <div
-                              className={`${styles.pill} ${styles.statusAction}`}
-                              role="button"
-                              tabIndex={0}
-                              onClick={(clickEv) => {
-                                clickEv.stopPropagation();
-                                openApplyModal(e.id);
-                              }}
-                              onKeyDown={(ev) => {
-                                if (ev.key === 'Enter' || ev.key === ' ') {
-                                  ev.stopPropagation();
-                                  openApplyModal(e.id);
-                                }
-                              }}
-                            >
-                              Зарегистрироваться
-                            </div>
-                          )
-                        ) : (
-                          <div className={`${styles.pill} ${styles.statusRegistered}`}>Завершено</div>
-                        )}
+                            <div className={`${styles.pill} ${styles.statusRegistered}`}>Завершено</div>
+                          )}
+                          <span className={styles.eventListArrow}>›</span>
+                        </div>
                       </div>
+                    );
+                  })}
+                </div>
 
-                      <div className={styles.cardTitle}>{e.title}</div>
-                      <div className={styles.cardDesc}>{e.description}</div>
+                {selected ? (
+                  <div className={styles.detailPanel}>
+                    <div className={styles.cardTop}>
+                      <div className={pillClass(selected.tag)}>{selected.tag}</div>
+                      <div className={`${styles.pill} ${styles.pillOutline}`}>
+                        {tab === 'upcoming' ? 'Предстоящее' : 'Прошедшее'}
+                      </div>
+                    </div>
+                    <div className={styles.detailPanelTitle}>{selected.title}</div>
+                    <div className={styles.detailPanelDesc}>{selected.description}</div>
 
-                      <div className={styles.meta}>
-                        <div className={styles.metaRow}>
+                    <div className={styles.infoGrid}>
+                      <div className={styles.infoItem}>
+                        <div className={`${styles.infoIconWrap} ${styles.wrapBlue}`}>
                           <img src={CalendarIcon} className={styles.metaIcon} />
-                          {e.date}
                         </div>
-                        <div className={styles.metaRow}>
-                          <img src={ScheduleIcon} className={styles.metaIcon} />
-                          {e.time}
+                        <div>
+                          <div className={styles.infoLabel}>Дата</div>
+                          <div className={styles.infoValue}>{selected.date}</div>
                         </div>
-                        <div className={styles.metaRow}>{e.place}</div>
                       </div>
-
-                      <div className={styles.cardBottom}>
-                        <div className={styles.participants}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <img src={PeopleIcon} className={styles.metaIcon} />
-                            {e.participants}
-                          </div>
+                      <div className={styles.infoItem}>
+                        <div className={`${styles.infoIconWrap} ${styles.wrapGreen}`}>
+                          <img src={ScheduleIcon} className={styles.metaIcon} />
                         </div>
-                        <div className={styles.chips}>
-                          {e.chips.map((c) => (
-                            <div key={c} className={styles.chip}>
-                              {c}
-                            </div>
-                          ))}
+                        <div>
+                          <div className={styles.infoLabel}>Время</div>
+                          <div className={styles.infoValue}>{selected.time}</div>
+                        </div>
+                      </div>
+                      <div className={styles.infoItem}>
+                        <div className={`${styles.infoIconWrap} ${styles.wrapPurple}`}>
+                          <img src={LocationIcon} className={styles.metaIcon} />
+                        </div>
+                        <div>
+                          <div className={styles.infoLabel}>Место</div>
+                          <div className={styles.infoValue}>{selected.place}</div>
+                        </div>
+                      </div>
+                      <div className={styles.infoItem}>
+                        <div className={`${styles.infoIconWrap} ${styles.wrapOrange}`}>
+                          <img src={PeopleIcon} className={styles.metaIcon} />
+                        </div>
+                        <div>
+                          <div className={styles.infoLabel}>Участники</div>
+                          <div className={styles.infoValue}>{selected.participants.replace(' участников', '')}</div>
                         </div>
                       </div>
                     </div>
-                  );
-                })}
+
+                    {selected.organizerName && (
+                      <>
+                        <div className={styles.sectionLabel}>Организатор</div>
+                        <div className={styles.organizerRow}>
+                          <div className={styles.orgAvatar}>
+                            {selected.organizerName.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
+                          </div>
+                          <div className={styles.orgName}>{selected.organizerName}</div>
+                        </div>
+                      </>
+                    )}
+
+                    <div className={styles.sectionLabel}>Теги</div>
+                    <div className={styles.tagsRow}>
+                      {selected.chips.map((c) => (
+                        <div key={c} className={styles.tagChip}>
+                          <img src={TagIcon} className={styles.chipIcon} />
+                          {c}
+                        </div>
+                      ))}
+                    </div>
+
+                    {selected.tag === 'Хакатон' && (
+                      <>
+                        <div className={styles.sectionLabel}>Команды</div>
+                        {isInTeam && (
+                          <p style={{ color: '#05CD99', fontSize: 13, marginBottom: 8 }}>Вы уже состоите в команде</p>
+                        )}
+                        <div style={{ marginBottom: 8 }}>
+                          {eventTeams.map((team) => (
+                            <div key={team.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #E2E8F0' }}>
+                              <span>
+                                {team.name}
+                                {(team.createdBy === userId || userJoinedTeamId === team.id) && (
+                                  <span style={{ marginLeft: 8, fontSize: 11, color: '#3B82F6' }}>(ваша)</span>
+                                )}
+                              </span>
+                              {team.createdBy !== userId && !isInTeam && (
+                                <button className={`${styles.actionBtn} ${styles.mutedBtn}`} style={{ padding: '4px 10px', fontSize: 12, height: 'auto' }} onClick={() => handleJoinTeam(team.id)}>
+                                  Вступить
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                          {eventTeams.length === 0 && <p style={{ color: '#A3AED0', fontSize: 13 }}>Команд пока нет</p>}
+                        </div>
+                        {!isInTeam && (
+                          <>
+                            {!createTeamOpen ? (
+                              <button
+                                className={`${styles.actionBtn} ${styles.mutedBtn}`}
+                                style={{ marginBottom: 12, height: 36, fontSize: 13 }}
+                                onClick={() => { setTeamModalEventId(selected.id); setCreateTeamOpen(true); }}
+                              >
+                                + Создать команду
+                              </button>
+                            ) : (
+                              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                                <input
+                                  className={styles.teacherInput}
+                                  placeholder="Название команды"
+                                  value={createTeamName}
+                                  onChange={(e) => setCreateTeamName(e.target.value)}
+                                  style={{ height: 36, fontSize: 13 }}
+                                />
+                                <button className={`${styles.actionBtn} ${styles.primaryBtn}`} style={{ height: 36, fontSize: 13, padding: '0 12px' }} onClick={handleCreateTeam} disabled={!createTeamName.trim()}>
+                                  Создать
+                                </button>
+                                <button className={`${styles.actionBtn} ${styles.dangerBtn}`} style={{ height: 36, fontSize: 13, padding: '0 12px' }} onClick={() => setCreateTeamOpen(false)}>
+                                  Отмена
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </>
+                    )}
+
+                    <div className={styles.modalActions}>
+                      {(() => {
+                        const existingApp = myApplicationByEventId[selected.id];
+                        if (existingApp) {
+                          return (
+                            <>
+                              <div className={`${styles.pill} ${styles[STATUS_STYLES[existingApp.status] ?? 'statusPending']}`} style={{ alignSelf: 'center' }}>
+                                {STATUS_LABELS[existingApp.status] ?? existingApp.status}
+                              </div>
+                              {existingApp.status === 'SUBMITTED' && (
+                                <button
+                                  className={`${styles.actionBtn} ${styles.dangerBtn}`}
+                                  onClick={() => handleCancelApplication(existingApp.id)}
+                                >
+                                  Отменить заявку
+                                </button>
+                              )}
+                            </>
+                          );
+                        }
+                        return (
+                          <button
+                            className={`${styles.actionBtn} ${styles.primaryBtn}`}
+                            onClick={() => openApplyModal(selected.id)}
+                          >
+                            Зарегистрироваться
+                          </button>
+                        );
+                      })()}
+                      <button className={`${styles.actionBtn} ${styles.mutedBtn}`} onClick={() => downloadIcs(selected)}>
+                        Добавить в календарь
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={styles.detailPanel}>
+                    <div className={styles.detailPanelPlaceholder}>Выберите мероприятие из списка</div>
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
       </div>
-
-      {selected && (
-        <div className={styles.modalOverlay} onClick={closeModal}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalTop}>
-              <div className={styles.modalBadges}>
-                <div className={pillClass(selected.tag)}>{selected.tag}</div>
-                <div className={`${styles.pill} ${styles.pillOutline}`}>
-                  {tab === 'upcoming' ? 'Предстоящее' : 'Прошедшее'}
-                </div>
-              </div>
-              <button className={styles.closeBtn} onClick={closeModal} aria-label="Закрыть">
-                <img src={CloseIcon} className={styles.closeIcon} />
-              </button>
-            </div>
-
-            <div className={styles.modalTitle}>{selected.title}</div>
-            <div className={styles.modalDesc}>{selected.description}</div>
-
-            <div className={styles.infoGrid}>
-              <div className={styles.infoItem}>
-                <div className={`${styles.infoIconWrap} ${styles.wrapBlue}`}>
-                  <img src={CalendarIcon} className={styles.metaIcon} />
-                </div>
-                <div>
-                  <div className={styles.infoLabel}>Дата</div>
-                  <div className={styles.infoValue}>{selected.date}</div>
-                </div>
-              </div>
-              <div className={styles.infoItem}>
-                <div className={`${styles.infoIconWrap} ${styles.wrapGreen}`}>
-                  <img src={ScheduleIcon} className={styles.metaIcon} />
-                </div>
-                <div>
-                  <div className={styles.infoLabel}>Время</div>
-                  <div className={styles.infoValue}>{selected.time}</div>
-                </div>
-              </div>
-              <div className={styles.infoItem}>
-                <div className={`${styles.infoIconWrap} ${styles.wrapPurple}`}>
-                  <img src={LocationIcon} className={styles.metaIcon} />
-                </div>
-                <div>
-                  <div className={styles.infoLabel}>Место</div>
-                  <div className={styles.infoValue}>{selected.place}</div>
-                </div>
-              </div>
-              <div className={styles.infoItem}>
-                <div className={`${styles.infoIconWrap} ${styles.wrapOrange}`}>
-                  <img src={PeopleIcon} className={styles.metaIcon} />
-                </div>
-                <div>
-                  <div className={styles.infoLabel}>Участники</div>
-                  <div className={styles.infoValue}>{selected.participants.replace(' участников', '')}</div>
-                </div>
-              </div>
-            </div>
-
-            {selected.organizerName && (
-              <>
-                <div className={styles.sectionLabel}>Организатор</div>
-                <div className={styles.organizerRow}>
-                  <div className={styles.orgAvatar}>
-                    {selected.organizerName.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
-                  </div>
-                  <div className={styles.orgName}>{selected.organizerName}</div>
-                </div>
-              </>
-            )}
-
-            <div className={styles.sectionLabel}>Теги</div>
-            <div className={styles.tagsRow}>
-              {selected.chips.map((c) => (
-                <div key={c} className={styles.tagChip}>
-                  <img src={TagIcon} className={styles.chipIcon} />
-                  {c}
-                </div>
-              ))}
-            </div>
-
-            {selected.tag === 'Хакатон' && (
-              <>
-                <div className={styles.sectionLabel}>Команды</div>
-                {isInTeam && (
-                  <p style={{ color: '#16a34a', fontSize: 13, marginBottom: 8 }}>Вы уже состоите в команде</p>
-                )}
-                <div style={{ marginBottom: 8 }}>
-                  {eventTeams.map((team) => (
-                    <div key={team.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f0f0f0' }}>
-                      <span>
-                        {team.name}
-                        {(team.createdBy === userId || userJoinedTeamId === team.id) && (
-                          <span style={{ marginLeft: 8, fontSize: 11, color: '#3a76f0' }}>(ваша)</span>
-                        )}
-                      </span>
-                      {team.createdBy !== userId && !isInTeam && (
-                        <button className={`${styles.actionBtn} ${styles.mutedBtn}`} style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => handleJoinTeam(team.id)}>
-                          Вступить
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  {eventTeams.length === 0 && <p style={{ color: '#888', fontSize: 13 }}>Команд пока нет</p>}
-                </div>
-                {!isInTeam && (
-                  <>
-                    {!createTeamOpen ? (
-                      <button
-                        className={`${styles.actionBtn} ${styles.mutedBtn}`}
-                        style={{ marginBottom: 12 }}
-                        onClick={() => { setTeamModalEventId(selected.id); setCreateTeamOpen(true); }}
-                      >
-                        + Создать команду
-                      </button>
-                    ) : (
-                      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                        <input
-                          className={styles.teacherInput}
-                          placeholder="Название команды"
-                          value={createTeamName}
-                          onChange={(e) => setCreateTeamName(e.target.value)}
-                        />
-                        <button className={`${styles.actionBtn} ${styles.mutedBtn}`} onClick={handleCreateTeam} disabled={!createTeamName.trim()}>
-                          Создать
-                        </button>
-                        <button className={`${styles.actionBtn} ${styles.dangerBtn}`} onClick={() => setCreateTeamOpen(false)}>
-                          Отмена
-                        </button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </>
-            )}
-
-            <div className={styles.modalActions}>
-              {(() => {
-                const existingApp = myApplicationByEventId[selected.id];
-                if (existingApp) {
-                  return (
-                    <>
-                      <div className={`${styles.pill} ${styles[STATUS_STYLES[existingApp.status] ?? 'statusPending']}`} style={{ alignSelf: 'center' }}>
-                        {STATUS_LABELS[existingApp.status] ?? existingApp.status}
-                      </div>
-                      {existingApp.status === 'SUBMITTED' && (
-                        <button
-                          className={`${styles.actionBtn} ${styles.dangerBtn}`}
-                          onClick={() => handleCancelApplication(existingApp.id)}
-                        >
-                          ⨯ Отменить заявку
-                        </button>
-                      )}
-                    </>
-                  );
-                }
-                return (
-                  <button
-                    className={`${styles.actionBtn} ${styles.mutedBtn}`}
-                    onClick={() => openApplyModal(selected.id)}
-                  >
-                    Зарегистрироваться
-                  </button>
-                );
-              })()}
-              <button className={`${styles.actionBtn} ${styles.mutedBtn}`} onClick={() => downloadIcs(selected)}>
-                Добавить в календарь
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {applyModalEventId && (
         <div className={styles.modalOverlay} onClick={closeApplyModal}>
@@ -1268,9 +1229,10 @@ const EventsPage = () => {
   const userName = useAppSelector((s) => s.auth.userName) || 'Иван Иванов';
   const userRole = useAppSelector((s) => s.auth.userRole) || 'Студент';
   const avatarInitials = useMemo(() => initialsFromName(userName), [userName]);
-  const isTeacher = userRole === 'Преподаватель' || userRole === 'Заведующий кафедрой';
 
-  return isTeacher ? <TeacherEventsView avatarInitials={avatarInitials} /> : <StudentEventsView avatarInitials={avatarInitials} />;
+  if (userRole === 'Заведующий кафедрой') return <Navigate to="/schedule" replace />;
+  if (userRole === 'Преподаватель') return <TeacherEventsView avatarInitials={avatarInitials} />;
+  return <StudentEventsView avatarInitials={avatarInitials} />;
 };
 
 export default EventsPage;

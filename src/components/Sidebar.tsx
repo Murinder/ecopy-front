@@ -154,7 +154,7 @@ const Sidebar = () => {
         })}
       </div>
 
-      <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
         <div className={sidebarStyles.container4}>
           <div className={sidebarStyles.primitiveSpan}>
             <div className={sidebarStyles.text8}>

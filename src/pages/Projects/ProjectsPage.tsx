@@ -834,7 +834,7 @@ const ProjectsPage = () => {
                           {taskError && (
                             <div style={{ padding: '8px 12px', marginBottom: 8, background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, color: '#DC2626', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                               <span>{taskError}</span>
-                              <button onClick={() => setTaskError(null)} style={{ background: 'none', border: 'none', color: '#DC2626', cursor: 'pointer', fontSize: 16 }}>×</button>
+                              <button onClick={() => setTaskError(null)} style={{ background: 'none', border: 'none', color: '#DC2626', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
                             </div>
                           )}
                           <div className={styles.projectsPage10}>
@@ -911,21 +911,21 @@ const ProjectsPage = () => {
                           <p className={styles.a} style={{ color: '#1B2559' }}>Создать новый проект</p>
                           <p className={styles.a3pr}>Заполните информацию о проекте для начала работы</p>
                         </div>
-                        <div className={styles.projectsPage}>
-                          <div className={styles.modalGroup}>
-                            <p className={styles.a3pr}>Название проекта</p>
-                            <input className={styles.modalInput} placeholder="Введите название проекта" value={createTitle} onChange={(e) => setCreateTitle(e.target.value)} />
-                          </div>
-                          <div className={styles.modalGroup}>
-                            <p className={styles.a3pr}>Описание</p>
-                            <textarea className={styles.modalTextarea} placeholder="Опишите цели и задачи проекта" value={createDescription} onChange={(e) => setCreateDescription(e.target.value)} />
-                          </div>
-                          <div className={styles.modalRow}>
+                        <div className={styles.modalBody}>
+                          <div className={styles.modalGrid}>
+                            <div className={styles.modalGroupHalf}>
+                              <p className={styles.a3pr}>Название проекта</p>
+                              <input className={styles.modalInput} placeholder="Введите название проекта" value={createTitle} onChange={(e) => setCreateTitle(e.target.value)} />
+                            </div>
                             <div className={styles.modalGroupHalf}>
                               <p className={styles.a3pr}>Дедлайн</p>
                               <input className={styles.modalInput} type="date" value={createEndDate} onChange={(e) => setCreateEndDate(e.target.value)} />
                             </div>
-                            <div className={styles.modalGroupHalf}>
+                            <div className={styles.modalGroup}>
+                              <p className={styles.a3pr}>Описание</p>
+                              <textarea className={styles.modalTextarea} placeholder="Опишите цели и задачи проекта" value={createDescription} onChange={(e) => setCreateDescription(e.target.value)} />
+                            </div>
+                            <div className={styles.modalGroup}>
                               <p className={styles.a3pr}>Участники</p>
                               <p style={{ fontSize: 13, color: '#94a3b8', margin: '8px 0 0' }}>Добавить участников можно после создания проекта</p>
                             </div>

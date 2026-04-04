@@ -8,7 +8,8 @@
   width: 100vw;
   min-height: 100vh;
   background: #f9fafb;
-  color: #0a0a0a;
+  color: #1B2559;
+  font-family: "DM Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .layout {
@@ -27,7 +28,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid #E2E8F0;
   background: #ffffff;
   padding: 16px 32px;
   width: 100%;
@@ -40,15 +41,15 @@
 }
 
 .title {
-  color: #0e1d45;
-  font-family: Inter, Arial, Helvetica, sans-serif;
-  font-size: 36px;
+  color: #1B2559;
+  font-family: "DM Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 28px;
   font-weight: 700;
-  line-height: 40px;
+  line-height: 1.3;
 }
 
 .subtitle {
-  color: #6a7282;
+  color: #A3AED0;
   font-size: 14px;
   line-height: 20px;
 }
@@ -61,10 +62,13 @@
 
 .notif {
   position: relative;
-  border-radius: 7px;
-  width: 36px;
-  height: 36px;
+  border-radius: 12px;
+  width: 40px;
+  height: 40px;
   background: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .notifIcon {
@@ -122,18 +126,28 @@
   display: inline-flex;
   align-items: center;
   border-radius: 9999px;
-  padding: 6px 10px;
-  background: #f5f5f5;
-  color: #737373;
+  padding: 8px 20px;
+  background: transparent;
+  color: #A3AED0;
   font-size: 14px;
+  font-weight: 500;
   user-select: none;
   cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: #f0f4ff;
+  }
 }
 
 .tabActive {
-  background: #e5e5e54d;
-  color: #0a0a0a;
-  border: 1px solid #e5e5e5;
+  background: #3B82F6;
+  color: #ffffff;
+  border: none;
+
+  &:hover {
+    background: #2563EB;
+  }
 }
 
 .grid {
@@ -142,11 +156,135 @@
   gap: 16px;
 }
 
+.listPanelLayout {
+  display: flex;
+  gap: 24px;
+  width: 100%;
+}
+
+.eventList {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.detailPanel {
+  width: 380px;
+  min-width: 380px;
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  padding: 24px;
+  align-self: flex-start;
+  position: sticky;
+  top: 24px;
+}
+
+.detailPanelTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1B2559;
+  margin-bottom: 8px;
+}
+
+.detailPanelDesc {
+  font-size: 14px;
+  color: #A3AED0;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.detailPanelPlaceholder {
+  color: #A3AED0;
+  font-size: 14px;
+  text-align: center;
+  padding: 40px 16px;
+}
+
+.eventListItem {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #E2E8F0;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover {
+    background: #f0f4ff;
+  }
+}
+
+.eventListItemActive {
+  background: #f0f4ff;
+}
+
+.eventListIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.iconHackathon {
+  background: #f3e8ff;
+  color: #7e22ce;
+}
+
+.iconCareer {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.iconEducation {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.eventListBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.eventListTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1B2559;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eventListDate {
+  font-size: 14px;
+  color: #A3AED0;
+  margin-top: 2px;
+}
+
+.eventListRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.eventListArrow {
+  color: #A3AED0;
+  font-size: 18px;
+}
+
 .card {
-  border: 1px solid #e5e5e5;
+  border: 1px solid #E2E8F0;
   border-radius: 16px;
   background: #ffffff;
-  box-shadow: 0 10px 15px -3px #0000001a, 0 4px 6px -4px #0000001a;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   padding: 18px;
 }
 
@@ -223,15 +361,15 @@
 
 .cardTitle {
   margin-top: 12px;
-  color: #0a0a0a;
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 28px;
+  color: #1B2559;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .cardDesc {
   margin-top: 6px;
-  color: #737373;
+  color: #A3AED0;
   font-size: 14px;
   line-height: 20px;
 }
@@ -247,7 +385,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #4a5565;
+  color: #A3AED0;
   font-size: 13px;
   line-height: 18px;
 }
@@ -269,7 +407,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  color: #4a5565;
+  color: #A3AED0;
   font-size: 13px;
 }
 
@@ -313,6 +451,14 @@
   .halfLeft {
     grid-column: 1 / -1;
   }
+  .listPanelLayout {
+    flex-direction: column;
+  }
+  .detailPanel {
+    width: 100%;
+    min-width: unset;
+    position: static;
+  }
 }
 
 @media (max-width: 768px) {
@@ -342,10 +488,10 @@
   position: relative;
   width: 100%;
   max-width: 720px;
-  border: 1px solid #e5e5e5;
-  border-radius: 16px;
+  border: 1px solid #E2E8F0;
+  border-radius: 20px;
   background: #ffffff;
-  box-shadow: 0 10px 15px -3px #0000001a, 0 4px 6px -4px #0000001a;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.24);
   padding: 22px 22px 18px;
 }
 
@@ -387,18 +533,18 @@
 
 .modalTitle {
   margin-top: 14px;
-  font-family: Inter, Arial, Helvetica, sans-serif;
-  font-size: 40px;
-  font-weight: 800;
-  line-height: 44px;
-  color: #0a0a0a;
+  font-family: "DM Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #1B2559;
 }
 
 .modalDesc {
   margin-top: 10px;
-  font-size: 20px;
-  line-height: 30px;
-  color: #737373;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #A3AED0;
 }
 
 .infoGrid {
@@ -438,21 +584,24 @@
 }
 
 .infoLabel {
-  color: #6a7282;
-  font-size: 16px;
+  color: #A3AED0;
+  font-size: 12px;
 }
 
 .infoValue {
-  color: #0a0a0a;
-  font-size: 18px;
+  color: #1B2559;
+  font-size: 14px;
   font-weight: 600;
   margin-top: 2px;
 }
 
 .sectionLabel {
   margin-top: 14px;
-  color: #6a7282;
-  font-size: 16px;
+  color: #A3AED0;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .organizerRow {
@@ -475,9 +624,9 @@
 }
 
 .orgName {
-  color: #0a0a0a;
-  font-size: 22px;
-  font-weight: 700;
+  color: #1B2559;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .tagsRow {
@@ -491,13 +640,13 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border-radius: 9999px;
-  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  border: 1px solid #E2E8F0;
   background: #ffffff;
-  padding: 8px 12px;
-  color: #171717;
-  font-size: 14px;
-  font-weight: 600;
+  padding: 4px 12px;
+  color: #1B2559;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .chipIcon {
@@ -511,30 +660,49 @@
   gap: 16px;
   margin-top: 18px;
   padding-top: 14px;
-  border-top: 1px solid #e5e5e5;
+  border-top: 1px solid #E2E8F0;
 }
 
 .actionBtn {
-  height: 52px;
+  height: 48px;
   border-radius: 12px;
-  border: 1px solid #e5e5e5;
+  border: 1px solid #E2E8F0;
   background: #ffffff;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: #f0f4ff;
+  }
+}
+
+.primaryBtn {
+  background: #3B82F6;
+  color: #ffffff;
+  border-color: #3B82F6;
+
+  &:hover {
+    background: #2563EB;
+  }
 }
 
 .dangerBtn {
-  color: #e7000b;
-  border-color: #f5b5b9;
+  color: #EE5D50;
+  border-color: rgba(238, 93, 80, 0.3);
+
+  &:hover {
+    background: rgba(238, 93, 80, 0.08);
+  }
 }
 
 .mutedBtn {
-  color: #0a0a0a;
+  color: #1B2559;
 }
 
 @media (max-width: 768px) {
@@ -569,22 +737,30 @@
 }
 
 .teacherNavBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 36px;
   height: 32px;
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #E2E8F0;
   background: #ffffff;
-  color: #0e1d45;
+  color: #1B2559;
   font-size: 20px;
-  line-height: 20px;
   cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: #f0f4ff;
+    border-color: #3B82F6;
+  }
 }
 
 .teacherMonthLabel {
-  font-family: Inter, Arial, Helvetica, sans-serif;
-  font-size: 28px;
+  font-family: "DM Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 22px;
   font-weight: 700;
-  color: #0e1d45;
+  color: #1B2559;
 }
 
 .teacherCreateBtn {
@@ -621,17 +797,17 @@
 }
 
 .teacherCalendarCard {
-  border: 1px solid #e5e7eb;
+  border: 1px solid #E2E8F0;
   border-radius: 16px;
   background: #ffffff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   padding: 16px 16px 18px;
 }
 
 .teacherCardTitle {
   font-size: 18px;
-  font-weight: 700;
-  color: #0e1d45;
+  font-weight: 600;
+  color: #1B2559;
   margin-bottom: 12px;
 }
 
@@ -644,7 +820,7 @@
 
 .teacherWeekday {
   text-align: center;
-  color: #6a7282;
+  color: #A3AED0;
   font-size: 12px;
   font-weight: 600;
   padding: 8px 0;
@@ -657,7 +833,7 @@
 }
 
 .teacherDayCell {
-  border: 1px solid #e5e7eb;
+  border: 1px solid #E2E8F0;
   border-radius: 12px;
   background: #ffffff;
   min-height: 76px;
@@ -684,7 +860,7 @@
 .teacherDayNum {
   font-size: 12px;
   font-weight: 600;
-  color: #0e1d45;
+  color: #1B2559;
 }
 
 .teacherDayEvent {
@@ -707,22 +883,22 @@
 }
 
 .teacherUpcomingCard {
-  border: 1px solid #e5e7eb;
+  border: 1px solid #E2E8F0;
   border-radius: 16px;
   background: #ffffff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   padding: 16px;
 }
 
 .teacherUpcomingTitle {
   font-size: 18px;
-  font-weight: 700;
-  color: #0e1d45;
+  font-weight: 600;
+  color: #1B2559;
 }
 
 .teacherUpcomingSub {
-  color: #6a7282;
-  font-size: 13px;
+  color: #A3AED0;
+  font-size: 12px;
   margin-top: 2px;
 }
 
@@ -739,13 +915,14 @@
   gap: 12px;
   padding: 10px;
   border-radius: 12px;
-  border: 1px solid #eef2f7;
+  border: 1px solid #E2E8F0;
   background: #ffffff;
   cursor: pointer;
+  transition: border-color 0.15s;
 }
 
 .teacherUpcomingItem:hover {
-  border-color: #bedbff;
+  border-color: #3B82F6;
 }
 
 .teacherUpcomingTime {
@@ -761,8 +938,8 @@
 
 .teacherUpcomingDay {
   font-size: 14px;
-  font-weight: 800;
-  color: #0e1d45;
+  font-weight: 700;
+  color: #1B2559;
 }
 
 .teacherUpcomingClock {
@@ -779,18 +956,18 @@
 
 .teacherUpcomingName {
   font-size: 14px;
-  font-weight: 700;
-  color: #0e1d45;
+  font-weight: 600;
+  color: #1B2559;
   line-height: 18px;
 }
 
 .teacherUpcomingPlace {
-  color: #6a7282;
+  color: #A3AED0;
   font-size: 12px;
 }
 
 .teacherUpcomingEmpty {
-  color: #6a7282;
+  color: #A3AED0;
   font-size: 14px;
   padding: 10px 4px;
 }
@@ -838,9 +1015,9 @@
   position: relative;
   width: 100%;
   max-width: 860px;
-  border-radius: 16px;
+  border-radius: 20px;
   background: #ffffff;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.24);
   padding: 22px;
 }
 
@@ -848,9 +1025,9 @@
   position: relative;
   width: 100%;
   max-width: 560px;
-  border-radius: 16px;
+  border-radius: 20px;
   background: #ffffff;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.24);
   padding: 22px;
 }
 
@@ -861,27 +1038,33 @@
   width: 34px;
   height: 34px;
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #E2E8F0;
   background: #ffffff;
-  color: #6a7282;
+  color: #A3AED0;
   font-size: 24px;
   line-height: 24px;
   cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    border-color: #3B82F6;
+    color: #1B2559;
+  }
 }
 
 .teacherModalTitle {
-  font-family: Inter, Arial, Helvetica, sans-serif;
-  font-size: 48px;
-  font-weight: 800;
-  color: #0e1d45;
-  line-height: 54px;
+  font-family: "DM Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1B2559;
+  line-height: 1.35;
   margin-top: 10px;
 }
 
 .teacherModalSubtitle {
-  font-size: 22px;
-  line-height: 30px;
-  color: #6a7282;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #A3AED0;
   margin-top: 8px;
 }
 
@@ -927,27 +1110,27 @@
 }
 
 .teacherInfoLabel {
-  color: #6a7282;
-  font-size: 16px;
+  color: #A3AED0;
+  font-size: 12px;
 }
 
 .teacherInfoValue {
-  color: #0e1d45;
-  font-size: 18px;
-  font-weight: 700;
+  color: #1B2559;
+  font-size: 14px;
+  font-weight: 600;
   margin-top: 2px;
 }
 
 .teacherSectionTitle {
-  font-size: 26px;
-  font-weight: 800;
-  color: #0e1d45;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1B2559;
   margin-top: 18px;
 }
 
 .teacherParticipants {
   margin-top: 10px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #E2E8F0;
   border-radius: 14px;
   overflow: hidden;
 }
@@ -957,7 +1140,7 @@
   align-items: center;
   gap: 12px;
   padding: 14px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid #E2E8F0;
 }
 
 .teacherParticipantRow:first-child {
@@ -977,9 +1160,9 @@
 }
 
 .teacherParticipantName {
-  font-size: 18px;
-  font-weight: 700;
-  color: #0e1d45;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1B2559;
 }
 
 .teacherModalActions {
@@ -990,33 +1173,43 @@
 }
 
 .teacherPrimaryBtn {
-  height: 56px;
-  border-radius: 14px;
+  height: 48px;
+  border-radius: 12px;
   border: 0;
-  background: #3a76f0;
+  background: #3B82F6;
   color: #ffffff;
-  font-size: 18px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 600;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover {
+    background: #2563EB;
+  }
 }
 
 .teacherSecondaryBtn {
-  height: 56px;
-  border-radius: 14px;
-  border: 1px solid #e5e7eb;
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid #E2E8F0;
   background: #ffffff;
-  color: #0e1d45;
-  font-size: 18px;
-  font-weight: 800;
+  color: #1B2559;
+  font-size: 14px;
+  font-weight: 600;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: #f0f4ff;
+  }
 }
 
 .teacherBtnIcon {
@@ -1025,13 +1218,13 @@
 }
 
 .teacherCreateTitle {
-  font-size: 28px;
-  font-weight: 800;
-  color: #0e1d45;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1B2559;
 }
 
 .teacherCreateSub {
-  color: #6a7282;
+  color: #A3AED0;
   font-size: 14px;
   margin-top: 4px;
 }
@@ -1057,30 +1250,42 @@
 
 .teacherLabel {
   font-size: 14px;
-  font-weight: 700;
-  color: #0e1d45;
+  font-weight: 500;
+  color: #1B2559;
 }
 
 .teacherInput,
 .teacherSelect {
-  height: 44px;
+  height: 48px;
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  padding: 0 12px;
+  border: 1.5px solid #E2E8F0;
+  padding: 0 16px;
   font-size: 14px;
-  color: #0e1d45;
+  color: #1B2559;
   background: #ffffff;
+  transition: border-color 0.15s;
+
+  &:focus {
+    outline: none;
+    border-color: #3B82F6;
+  }
 }
 
 .teacherTextarea {
   min-height: 96px;
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  padding: 12px;
+  border: 1.5px solid #E2E8F0;
+  padding: 12px 16px;
   font-size: 14px;
-  color: #0e1d45;
+  color: #1B2559;
   background: #ffffff;
   resize: vertical;
+  transition: border-color 0.15s;
+
+  &:focus {
+    outline: none;
+    border-color: #3B82F6;
+  }
 }
 
 .teacherCheckboxRow {
@@ -1088,8 +1293,8 @@
   align-items: center;
   gap: 10px;
   font-size: 14px;
-  font-weight: 700;
-  color: #0e1d45;
+  font-weight: 500;
+  color: #1B2559;
   user-select: none;
 }
 
@@ -1101,27 +1306,37 @@
 }
 
 .teacherCancelBtn {
-  height: 44px;
+  height: 48px;
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #E2E8F0;
   background: #ffffff;
-  color: #0e1d45;
+  color: #1B2559;
   font-size: 14px;
-  font-weight: 800;
-  padding: 0 18px;
+  font-weight: 600;
+  padding: 0 24px;
   cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: #f0f4ff;
+  }
 }
 
 .teacherSubmitBtn {
-  height: 44px;
+  height: 48px;
   border-radius: 12px;
   border: 0;
-  background: #3a76f0;
+  background: #3B82F6;
   color: #ffffff;
   font-size: 14px;
-  font-weight: 800;
-  padding: 0 18px;
+  font-weight: 600;
+  padding: 0 24px;
   cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover {
+    background: #2563EB;
+  }
 }
 
 .teacherSubmitBtn:disabled {
@@ -1137,15 +1352,15 @@
 
 @media (max-width: 768px) {
   .teacherMonthLabel {
-    font-size: 20px;
+    font-size: 18px;
   }
   .teacherModalTitle {
-    font-size: 30px;
-    line-height: 34px;
+    font-size: 18px;
+    line-height: 1.35;
   }
   .teacherModalSubtitle {
-    font-size: 16px;
-    line-height: 24px;
+    font-size: 13px;
+    line-height: 1.5;
   }
   .teacherInfoGrid {
     grid-template-columns: 1fr;
@@ -1156,4 +1371,22 @@
   .teacherRow2 {
     grid-template-columns: 1fr;
   }
+}
+
+.loading {
+  color: #A3AED0;
+  font-size: 14px;
+  padding: 20px 0;
+}
+
+.error {
+  color: #EE5D50;
+  font-size: 14px;
+  padding: 20px 0;
+}
+
+.empty {
+  color: #A3AED0;
+  font-size: 14px;
+  padding: 20px 0;
 }

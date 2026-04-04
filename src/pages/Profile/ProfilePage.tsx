@@ -663,7 +663,7 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
                               ))}
                             </select>
                             <button onClick={addSkill} disabled={!newSkillName.trim()} style={{ height: 28, borderRadius: 8, border: 'none', background: '#3a76f0', color: '#fff', padding: '0 10px', fontSize: 13, cursor: 'pointer' }}>OK</button>
-                            <button onClick={() => { setShowSkillForm(false); setNewSkillName(''); setNewSkillLevel(1); }} style={{ height: 28, borderRadius: 8, border: '1px solid #e5e5e5', background: '#fff', padding: '0 10px', fontSize: 13, cursor: 'pointer' }}>×</button>
+                            <button onClick={() => { setShowSkillForm(false); setNewSkillName(''); setNewSkillLevel(1); }} style={{ height: 28, borderRadius: 8, border: '1px solid #e5e5e5', background: '#fff', padding: '0 10px', fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
                           </span>
                         ) : (
                           <span className={`${styles.chip} ${styles.addChip}`} onClick={() => setShowSkillForm(true)} role="button" tabIndex={0}>+ Добавить</span>
