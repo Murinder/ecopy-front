@@ -67,6 +67,12 @@ export interface RatingAchievementDto {
   relatedEntityId: string | null;
 }
 
+export interface LeaderboardDto {
+  topStudents: StudentRatingDto[];
+  userRank: number;
+  totalStudents: number;
+}
+
 export const ratingApi = createApi({
   reducerPath: 'ratingApi',
   baseQuery: fetchBaseQuery({
@@ -105,6 +111,13 @@ export const ratingApi = createApi({
       query: (userId) => ({ url: `/api/v1/ratings/students/${userId}/achievements` }),
       providesTags: ['Ratings'],
     }),
+    getLeaderboard: builder.query<ApiResponse<LeaderboardDto>, { userId: string; limit?: number }>({
+      query: ({ userId, limit }) => ({
+        url: `/api/v1/ratings/students/${userId}/leaderboard`,
+        params: { limit: limit ?? 10 },
+      }),
+      providesTags: ['Ratings'],
+    }),
   }),
 });
 
@@ -115,4 +128,5 @@ export const {
   useGetRatingBreakdownQuery,
   useGetComparisonQuery,
   useGetAchievementsQuery,
+  useGetLeaderboardQuery,
 } = ratingApi;

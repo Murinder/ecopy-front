@@ -1,7 +1,3 @@
-* {
-  box-sizing: border-box;
-}
-
 .page {
   display: flex;
   flex-direction: column;
@@ -107,6 +103,7 @@
   background: #ffffff;
   padding: 16px 32px;
   width: 100%;
+  height: 89px;
 }
 .titleWrap {
   display: flex;

@@ -1,7 +1,3 @@
-* {
-  box-sizing: border-box;
-}
-
 .a26 {
   display: flex;
   flex-direction: column;
@@ -50,6 +46,7 @@
   border-bottom: 1px solid var(--border-dark);
   padding: 24px;
   width: 280px;
+  height: 89px;
 }
 
 .icon {
@@ -231,6 +228,7 @@
   background: #ffffff;
   padding: 16px 32px;
   width: 100%;
+  height: 89px;
 }
 .container5 {
   display: flex;

@@ -184,6 +184,8 @@ const ProjectsPage = () => {
   const [removeMember] = useRemoveProjectMemberMutation();
   const [addMemberEmail, setAddMemberEmail] = useState('');
   const [addMemberError, setAddMemberError] = useState<string | null>(null);
+  const [foundUser, setFoundUser] = useState<{ id: string; email: string; name: string } | null>(null);
+  const [selectedRole, setSelectedRole] = useState<string>('MEMBER');
   const { data: allStudents } = useGetStudentsQuery();
   const { data: allTeachers } = useGetTeachersQuery();
   const allUsersForLookup = useMemo(() => [...(allStudents?.data ?? []), ...(allTeachers?.data ?? [])], [allStudents, allTeachers]);
@@ -801,29 +803,65 @@ const ProjectsPage = () => {
                                 });
                               })()}
                             </div>
-                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                              <input
-                                style={{ flex: 1, padding: '8px 12px', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: 13 }}
-                                placeholder="Email участника"
-                                value={addMemberEmail}
-                                onChange={(e) => { setAddMemberEmail(e.target.value); setAddMemberError(null); }}
-                              />
-                              <button
-                                style={{ padding: '8px 14px', background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}
-                                onClick={async () => {
-                                  if (!addMemberEmail.trim() || !selectedProjectId) return;
-                                  setAddMemberError(null);
-                                  const found = allUsersForLookup.find(u => u.email === addMemberEmail.trim());
-                                  if (!found) { setAddMemberError('Пользователь не найден'); return; }
-                                  if (studentMembers.some(m => m.userId === found.id)) { setAddMemberError('Уже участник'); return; }
-                                  try {
-                                    await addMember({ projectId: selectedProjectId, userId: found.id, role: 'MEMBER' }).unwrap();
-                                    refetchMembers();
-                                    setAddMemberEmail('');
-                                  } catch { setAddMemberError('Ошибка при добавлении'); }
-                                }}
-                              >+ Добавить</button>
-                            </div>
+                            {!foundUser ? (
+                              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                <input
+                                  style={{ flex: 1, padding: '8px 12px', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: 13 }}
+                                  placeholder="Email участника"
+                                  value={addMemberEmail}
+                                  onChange={(e) => { setAddMemberEmail(e.target.value); setAddMemberError(null); }}
+                                />
+                                <button
+                                  style={{ padding: '8px 14px', background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                  onClick={() => {
+                                    if (!addMemberEmail.trim() || !selectedProjectId) return;
+                                    setAddMemberError(null);
+                                    const found = allUsersForLookup.find(u => u.email === addMemberEmail.trim());
+                                    if (!found) { setAddMemberError('Пользователь не найден'); return; }
+                                    if (studentMembers.some(m => m.userId === found.id)) { setAddMemberError('Уже участник'); return; }
+                                    const name = [found.firstName, found.lastName].filter(Boolean).join(' ') || found.email;
+                                    setFoundUser({ id: found.id, email: found.email, name });
+                                    setSelectedRole('MEMBER');
+                                    setAddMemberError(null);
+                                  }}
+                                >Найти</button>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div style={{ padding: '8px 12px', background: '#EFF6FF', borderRadius: 8, fontSize: 13 }}>
+                                  <span style={{ fontWeight: 600, color: '#1B2559' }}>{foundUser.name}</span>
+                                  <span style={{ color: '#64748b', marginLeft: 6 }}>{foundUser.email}</span>
+                                </div>
+                                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                  <select
+                                    style={{ flex: 1, padding: '8px 12px', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: 13, background: '#fff', cursor: 'pointer' }}
+                                    value={selectedRole}
+                                    onChange={(e) => setSelectedRole(e.target.value)}
+                                  >
+                                    <option value="MEMBER">Участник</option>
+                                    <option value="MENTOR">Наставник</option>
+                                    <option value="OBSERVER">Наблюдатель</option>
+                                  </select>
+                                  <button
+                                    style={{ padding: '8px 14px', background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                    onClick={async () => {
+                                      if (!selectedProjectId) return;
+                                      try {
+                                        await addMember({ projectId: selectedProjectId, userId: foundUser.id, role: selectedRole }).unwrap();
+                                        refetchMembers();
+                                        setFoundUser(null);
+                                        setSelectedRole('MEMBER');
+                                        setAddMemberEmail('');
+                                      } catch { setAddMemberError('Ошибка при добавлении'); }
+                                    }}
+                                  >+ Добавить</button>
+                                  <button
+                                    style={{ padding: '8px 14px', background: '#E2E8F0', color: '#1B2559', border: 'none', borderRadius: 8, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                    onClick={() => { setFoundUser(null); setSelectedRole('MEMBER'); setAddMemberError(null); }}
+                                  >Отмена</button>
+                                </div>
+                              </div>
+                            )}
                             {addMemberError && <p style={{ color: '#EE5D50', fontSize: 12, marginTop: 4 }}>{addMemberError}</p>}
                           </div>
                         )}

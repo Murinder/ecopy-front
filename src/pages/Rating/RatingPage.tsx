@@ -13,10 +13,10 @@ import ChatIcon from '../../assets/icons/ui-chat.svg';
 import { useAppSelector } from '../../app/hooks';
 import {
   useGetStudentRatingQuery,
-  useGetTopStudentsQuery,
   useGetRatingBreakdownQuery,
   useGetComparisonQuery,
   useGetAchievementsQuery,
+  useGetLeaderboardQuery,
 } from '../../services/ratingApi';
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -33,33 +33,31 @@ const RatingPage = () => {
 
   const { data: myRatingResp, isLoading: ratingLoading, isError: ratingError } =
     useGetStudentRatingQuery(userId, { skip: !userId });
-  const { data: topStudentsResp } = useGetTopStudentsQuery(100);
   const { data: breakdownResp } = useGetRatingBreakdownQuery(userId, { skip: !userId });
   const { data: comparisonResp } = useGetComparisonQuery(userId, { skip: !userId });
   const { data: achievementsResp } = useGetAchievementsQuery(userId, { skip: !userId });
+  const { data: leaderboardResp } = useGetLeaderboardQuery(
+    { userId, limit: 10 },
+    { skip: !userId },
+  );
 
   const myRating = myRatingResp?.data;
-  const topStudents = topStudentsResp?.data;
   const breakdown = breakdownResp?.data;
   const comparison = comparisonResp?.data;
   const achievements = achievementsResp?.data;
+  const leaderboard = leaderboardResp?.data;
 
   const totalScore = myRating?.totalScore ?? 0;
   const scoreRounded = Math.round(totalScore);
 
-  const myRank = useMemo(() => {
-    if (!topStudents || !userId) return null;
-    const idx = topStudents.findIndex((s) => s.userId === userId);
-    return idx >= 0 ? idx + 1 : null;
-  }, [topStudents, userId]);
-
-  const totalStudents = topStudents?.length ?? 0;
+  const myRank = leaderboard?.userRank ?? null;
+  const totalStudents = leaderboard?.totalStudents ?? 0;
 
   const leaders = useMemo(() => {
-    if (!topStudents || topStudents.length === 0) {
+    if (!leaderboard?.topStudents || leaderboard.topStudents.length === 0) {
       return [];
     }
-    const top = topStudents.slice(0, 10).map((s, i) => ({
+    const top = leaderboard.topStudents.map((s, i) => ({
       rank: i + 1,
       name: s.userName ?? `Студент ${s.userId.slice(0, 4)}`,
       score: Math.round(s.totalScore),
@@ -75,7 +73,7 @@ const RatingPage = () => {
       });
     }
     return top;
-  }, [topStudents, userId, userName, scoreRounded, myRank]);
+  }, [leaderboard, userId, userName, scoreRounded, myRank]);
 
   const statusLabel =
     myRating?.verificationStatus === 'VERIFIED' ? 'Подтверждён'
@@ -97,9 +95,6 @@ const RatingPage = () => {
       { subject: 'Академичность', value: breakdown.academicScore },
       { subject: 'Активность', value: breakdown.activityScore },
       { subject: 'Коммуникация', value: breakdown.communicationScore },
-      { subject: 'Лидерство', value: Math.round((breakdown.activityScore + breakdown.communicationScore) / 2) },
-      { subject: 'Проекты', value: Math.round(breakdown.academicScore * 0.8) },
-      { subject: 'Инновации', value: Math.round(breakdown.activityScore * 0.7) },
     ];
   }, [breakdown]);
 

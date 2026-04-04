@@ -152,6 +152,14 @@ const SKILL_LEVEL_LABELS: Record<number, string> = {
   5: 'Эксперт',
 };
 
+const LANG_PROFICIENCY_LABELS: Record<string, string> = {
+  BEGINNER: 'Начальный',
+  INTERMEDIATE: 'Средний',
+  ADVANCED: 'Продвинутый',
+  FLUENT: 'Свободный',
+  NATIVE: 'Родной',
+};
+
 const StudentProfileView = ({ userName, userId }: { userName: string; userId: string }) => {
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
@@ -160,6 +168,10 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
   const [newSkillLevel, setNewSkillLevel] = useState(1);
   const [showSkillForm, setShowSkillForm] = useState(false);
   const [pendingSkillLevels, setPendingSkillLevels] = useState<Record<string, number>>({});
+  const [newLangName, setNewLangName] = useState('');
+  const [newLangProficiency, setNewLangProficiency] = useState('INTERMEDIATE');
+  const [showLangForm, setShowLangForm] = useState(false);
+  const [pendingLangProficiencies, setPendingLangProficiencies] = useState<Record<string, string>>({});
   const [showDocuments, setShowDocuments] = useState(false);
   const { data: profileData, isLoading, isError, refetch: refetchProfile } = useGetProfileQuery(userId, { skip: !userId });
   const { data: linksData } = useGetUserLinksQuery(userId, { skip: !userId });
@@ -303,7 +315,7 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
       const addedLangs = draft.languages.filter(l => !profile.languages.includes(l));
       const removedLangs = profile.languages.filter(l => !draft.languages.includes(l));
       const langOps = [
-        ...addedLangs.map(l => createUserLanguage({ userId, language: l, proficiency: 'INTERMEDIATE' }).unwrap()),
+        ...addedLangs.map(l => createUserLanguage({ userId, language: l, proficiency: (pendingLangProficiencies[l] || 'INTERMEDIATE') as 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'FLUENT' | 'NATIVE' }).unwrap()),
         ...removedLangs.map(l => deleteUserLanguage({ userId, language: l }).unwrap()),
       ];
 
@@ -337,9 +349,22 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
   };
 
   const addLanguage = () => {
-    const name = window.prompt('Введите язык');
-    if (!name) return;
-    setDraft((p) => ({ ...p, languages: [...p.languages, name.trim()].filter(Boolean) }));
+    const trimmed = newLangName.trim();
+    if (!trimmed || draft.languages.includes(trimmed)) return;
+    setDraft((p) => ({ ...p, languages: [...p.languages, trimmed] }));
+    setPendingLangProficiencies((prev) => ({ ...prev, [trimmed]: newLangProficiency }));
+    setNewLangName('');
+    setNewLangProficiency('INTERMEDIATE');
+    setShowLangForm(false);
+  };
+
+  const removeLanguage = (name: string) => {
+    setDraft((p) => ({ ...p, languages: p.languages.filter(l => l !== name) }));
+    setPendingLangProficiencies((prev) => {
+      const copy = { ...prev };
+      delete copy[name];
+      return copy;
+    });
   };
 
   if (isLoading) {
@@ -689,12 +714,38 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
                     {isEditing ? (
                       <>
                         {draft.languages.map((l) => (
-                          <span key={l} className={styles.chip}>
+                          <span key={l} className={styles.chip} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                             {l}
-                            <span onClick={() => setDraft((p) => ({ ...p, languages: p.languages.filter(x => x !== l) }))} role="button" tabIndex={0} style={{ marginLeft: 6, cursor: 'pointer', opacity: 0.6 }}>×</span>
+                            {pendingLangProficiencies[l] && (
+                              <span style={{ fontSize: 11, opacity: 0.6 }}>{LANG_PROFICIENCY_LABELS[pendingLangProficiencies[l]]}</span>
+                            )}
+                            <span onClick={() => removeLanguage(l)} role="button" tabIndex={0} style={{ marginLeft: 2, cursor: 'pointer', opacity: 0.6 }}>×</span>
                           </span>
                         ))}
-                        <span className={`${styles.chip} ${styles.addChip}`} onClick={addLanguage} role="button" tabIndex={0}>+ Добавить</span>
+                        {showLangForm ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <input
+                              value={newLangName}
+                              onChange={(e) => setNewLangName(e.target.value)}
+                              placeholder="Язык"
+                              style={{ width: 120, height: 28, borderRadius: 8, border: '1px solid #e5e5e5', padding: '0 8px', fontSize: 13 }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') addLanguage(); }}
+                            />
+                            <select
+                              value={newLangProficiency}
+                              onChange={(e) => setNewLangProficiency(e.target.value)}
+                              style={{ height: 28, borderRadius: 8, border: '1px solid #e5e5e5', padding: '0 4px', fontSize: 13 }}
+                            >
+                              {Object.entries(LANG_PROFICIENCY_LABELS).map(([key, label]) => (
+                                <option key={key} value={key}>{label}</option>
+                              ))}
+                            </select>
+                            <button onClick={addLanguage} disabled={!newLangName.trim()} style={{ height: 28, borderRadius: 8, border: 'none', background: '#3a76f0', color: '#fff', padding: '0 10px', fontSize: 13, cursor: 'pointer' }}>OK</button>
+                            <button onClick={() => { setShowLangForm(false); setNewLangName(''); setNewLangProficiency('INTERMEDIATE'); }} style={{ height: 28, borderRadius: 8, border: '1px solid #e5e5e5', background: '#fff', padding: '0 10px', fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                          </span>
+                        ) : (
+                          <span className={`${styles.chip} ${styles.addChip}`} onClick={() => setShowLangForm(true)} role="button" tabIndex={0}>+ Добавить</span>
+                        )}
                       </>
                     ) : (
                       <>
@@ -702,7 +753,7 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
                           <span key={l.language} className={styles.chip}>
                             {l.language}
                             <span style={{ fontSize: 11, opacity: 0.6, marginLeft: 4 }}>
-                              {l.proficiency === 'NATIVE' ? 'Родной' : l.proficiency === 'ADVANCED' ? 'Продвинутый' : l.proficiency === 'INTERMEDIATE' ? 'Средний' : l.proficiency === 'BEGINNER' ? 'Начальный' : l.proficiency}
+                              {LANG_PROFICIENCY_LABELS[l.proficiency] || l.proficiency}
                             </span>
                           </span>
                         ))}
