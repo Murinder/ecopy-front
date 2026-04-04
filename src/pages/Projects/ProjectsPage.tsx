@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppSelector } from '../../app/hooks';
 import styles from './ProjectsPage.module.scss';
 import BellIcon from '../../assets/icons/mjbmqg4r-fcbhx7k.svg';
@@ -232,6 +232,7 @@ const ProjectsPage = () => {
   const [deleteDocument] = useDeleteDocumentMutation();
   const [uploading, setUploading] = useState(false);
   const [uploadMsg, setUploadMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const docs = docsResp?.data || [];
 
   const onFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -296,7 +297,6 @@ const ProjectsPage = () => {
     setCreating(true);
     try {
       const res = await createProject(body).unwrap();
-      // Auto-add creator as LEADER
       try {
         await addMember({ projectId: res.data.id, userId: userId, role: 'LEADER' }).unwrap();
       } catch { /* may fail if backend auto-adds creator */ }
@@ -510,7 +510,7 @@ const ProjectsPage = () => {
     return c;
   }, [teacherProjects]);
 
-  const teacherList = useMemo(() => {
+  const teacherListFiltered = useMemo(() => {
     if (teacherTab === 'all') return teacherProjects;
     if (teacherTab === 'active') return teacherProjects.filter((p) => p.statusKey === 'active' || p.statusKey === 'delay');
     if (teacherTab === 'review') return teacherProjects.filter((p) => p.statusKey === 'review');
@@ -533,6 +533,30 @@ const ProjectsPage = () => {
     closeTeacherModal();
   };
 
+  // Selected student project for right panel
+  const selectedStudentProject = useMemo(
+    () => projects.find((p) => p.id === selectedProjectId) || null,
+    [projects, selectedProjectId]
+  );
+
+  useEffect(() => {
+    if (!selectedProjectId) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedProjectId(undefined);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedProjectId]);
+
+  useEffect(() => {
+    if (!teacherSelectedId) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeTeacherModal();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [teacherSelectedId]);
+
   return (
     <div className={styles.a26}>
       <div className={styles.text}>
@@ -541,6 +565,7 @@ const ProjectsPage = () => {
       <div className={styles.studentLayout}>
         <Sidebar />
         <div className={styles.container30}>
+          {/* Header Bar */}
           <div className={styles.container7}>
             <div className={styles.container5}>
               <p className={styles.a9}>{isHead ? 'Топ проекты' : isTeacher ? 'Курируемые проекты' : 'Мои проекты'}</p>
@@ -563,9 +588,12 @@ const ProjectsPage = () => {
               </div>
             </div>
           </div>
+
+          {/* Main Content */}
           <div className={styles.mainContent}>
             <div className={styles.projectsPage11}>
               {isHead ? (
+                /* ═══ DEPARTMENT HEAD VIEW ═══ */
                 <>
                   <div className={styles.headStats}>
                     <div className={styles.headStatCard}>
@@ -615,99 +643,85 @@ const ProjectsPage = () => {
                     </button>
                   </div>
 
-                  <div className={styles.headList}>
-                    {projectsLoading && <p className={styles.loading}>Загрузка...</p>}
-                    {!projectsLoading && headList.length === 0 && <p className={styles.empty}>Нет данных</p>}
-                    {headList.map((p) => (
-                      <HeadProjectCard key={p.id} project={p} onOpen={() => setHeadSelectedId(p.id)} />
-                    ))}
+                  <div className={styles.headTwoPanel}>
+                    <div className={styles.headLeftPanel}>
+                      <div className={styles.headList}>
+                        {projectsLoading && <p className={styles.loading}>Загрузка...</p>}
+                        {!projectsLoading && headList.length === 0 && <p className={styles.empty}>Нет данных</p>}
+                        {headList.map((p, index) => (
+                          <HeadProjectCard key={p.id} project={p} position={index + 1} onOpen={() => setHeadSelectedId(p.id)} />
+                        ))}
+                      </div>
+                    </div>
+                    {selectedHeadProject && (
+                      <div className={styles.headRightPanel}>
+                        <HeadProjectPanel project={selectedHeadProject} onClose={() => setHeadSelectedId(null)} />
+                      </div>
+                    )}
                   </div>
-
-                  {selectedHeadProject && <HeadProjectModal project={selectedHeadProject} onClose={() => setHeadSelectedId(null)} />}
                 </>
               ) : isTeacher ? (
+                /* ═══ TEACHER VIEW ═══ */
                 <>
                   <div className={styles.teacherTabs}>
-                    <button
-                      type="button"
-                      className={teacherTab === 'all' ? styles.teacherTabActive : styles.teacherTab}
-                      onClick={() => setTeacherTab('all')}
-                    >
+                    <button type="button" className={teacherTab === 'all' ? styles.teacherTabActive : styles.teacherTab} onClick={() => setTeacherTab('all')}>
                       Все проекты ({teacherCounts.all})
                     </button>
-                    <button
-                      type="button"
-                      className={teacherTab === 'active' ? styles.teacherTabActive : styles.teacherTab}
-                      onClick={() => setTeacherTab('active')}
-                    >
+                    <button type="button" className={teacherTab === 'active' ? styles.teacherTabActive : styles.teacherTab} onClick={() => setTeacherTab('active')}>
                       Активные ({teacherCounts.active})
                     </button>
-                    <button
-                      type="button"
-                      className={teacherTab === 'review' ? styles.teacherTabActive : styles.teacherTab}
-                      onClick={() => setTeacherTab('review')}
-                    >
+                    <button type="button" className={teacherTab === 'review' ? styles.teacherTabActive : styles.teacherTab} onClick={() => setTeacherTab('review')}>
                       На проверке ({teacherCounts.review})
                     </button>
-                    <button
-                      type="button"
-                      className={teacherTab === 'done' ? styles.teacherTabActive : styles.teacherTab}
-                      onClick={() => setTeacherTab('done')}
-                    >
+                    <button type="button" className={teacherTab === 'done' ? styles.teacherTabActive : styles.teacherTab} onClick={() => setTeacherTab('done')}>
                       Завершенные ({teacherCounts.done})
                     </button>
                   </div>
 
-                  <div className={styles.teacherGrid}>
-                    {projectsLoading && <div style={{ padding: 12 }}>Загрузка проектов...</div>}
-                    {!projectsLoading && teacherList.length === 0 && <p className={styles.empty}>Нет данных</p>}
-                    {!projectsLoading &&
-                      teacherList.map((p) => (
-                        <TeacherProjectCard key={p.id} project={p} onOpen={() => openTeacherModal(p.id)} />
-                      ))}
+                  <div className={styles.teacherTwoPanel}>
+                    <div className={styles.teacherLeftPanel}>
+                      <div className={styles.teacherGrid}>
+                        {projectsLoading && <div style={{ padding: 12, color: '#6a7282' }}>Загрузка проектов...</div>}
+                        {!projectsLoading && teacherListFiltered.length === 0 && <p className={styles.empty}>Нет данных</p>}
+                        {!projectsLoading &&
+                          teacherListFiltered.map((p) => (
+                            <TeacherProjectCard key={p.id} project={p} onOpen={() => openTeacherModal(p.id)} />
+                          ))}
+                      </div>
+                    </div>
+                    {teacherSelectedId && (
+                      <div className={styles.teacherRightPanel}>
+                        <TeacherProjectPanel
+                          project={teacherProjects.find((p) => p.id === teacherSelectedId) || null}
+                          commentDraft={teacherCommentDraft}
+                          onChangeComment={setTeacherCommentDraft}
+                          onClose={closeTeacherModal}
+                          onSendComment={sendTeacherComment}
+                          members={(teacherMembersResp?.data || []).map((m) => ({
+                            initials: (m.userName || '').split(' ').map((w: string) => w[0] || '').join('').toUpperCase() || m.userId.replace(/-/g, '').slice(0, 2).toUpperCase(),
+                            name: m.userName || m.userId.slice(0, 8),
+                            role: m.role === 'LEADER' ? 'Руководитель' : m.role === 'MENTOR' ? 'Наставник' : m.role === 'OBSERVER' ? 'Наблюдатель' : 'Участник',
+                          }))}
+                          tasks={teacherTasksResp?.data || []}
+                          documents={teacherDocsResp?.data || []}
+                        />
+                      </div>
+                    )}
                   </div>
-
-                  {teacherSelectedId && (
-                    <TeacherProjectModal
-                      project={teacherProjects.find((p) => p.id === teacherSelectedId) || null}
-                      commentDraft={teacherCommentDraft}
-                      onChangeComment={setTeacherCommentDraft}
-                      onClose={closeTeacherModal}
-                      onSendComment={sendTeacherComment}
-                      members={(teacherMembersResp?.data || []).map((m) => ({
-                        initials: (m.userName || '').split(' ').map((w: string) => w[0] || '').join('').toUpperCase() || m.userId.replace(/-/g, '').slice(0, 2).toUpperCase(),
-                        name: m.userName || m.userId.slice(0, 8),
-                        role: m.role === 'LEADER' ? 'Руководитель' : m.role === 'MENTOR' ? 'Наставник' : m.role === 'OBSERVER' ? 'Наблюдатель' : 'Участник',
-                      }))}
-                      tasks={teacherTasksResp?.data || []}
-                      documents={teacherDocsResp?.data || []}
-                    />
-                  )}
                 </>
               ) : (
+                /* ═══ STUDENT VIEW ═══ */
                 <>
                   <div className={styles.container8}>
                     <div className={styles.primitiveDiv}>
-                      <button
-                        type="button"
-                        className={studentTab === 'all' ? styles.primitiveButton : styles.tabInactive}
-                        onClick={() => setStudentTab('all')}
-                      >
+                      <button type="button" className={studentTab === 'all' ? styles.primitiveButton : styles.tabInactive} onClick={() => setStudentTab('all')}>
                         <p className={styles.a12}>Все проекты</p>
                       </button>
-                      <button
-                        type="button"
-                        className={studentTab === 'active' ? styles.primitiveButton : styles.tabInactive}
-                        onClick={() => setStudentTab('active')}
-                      >
-                        <p className={styles.a13}>Активные</p>
+                      <button type="button" className={studentTab === 'active' ? styles.primitiveButton : styles.tabInactive} onClick={() => setStudentTab('active')}>
+                        <p className={studentTab === 'active' ? styles.a12 : styles.a13}>Активные</p>
                       </button>
-                      <button
-                        type="button"
-                        className={studentTab === 'archive' ? styles.primitiveButton : styles.tabInactive}
-                        onClick={() => setStudentTab('archive')}
-                      >
-                        <p className={styles.a14}>Архив</p>
+                      <button type="button" className={studentTab === 'archive' ? styles.primitiveButton : styles.tabInactive} onClick={() => setStudentTab('archive')}>
+                        <p className={studentTab === 'archive' ? styles.a12 : styles.a14}>Архив</p>
                       </button>
                     </div>
                     <div className={styles.button9} onClick={openCreateProject}>
@@ -716,63 +730,200 @@ const ProjectsPage = () => {
                     </div>
                   </div>
 
-                  <div className={styles.container29}>
-                    {projectsLoading && <div style={{ padding: 12 }}>Загрузка проектов...</div>}
-                    {projects.length === 0 && !projectsLoading && studentTab === 'all' && (
-                      <div style={{ padding: '32px 16px', textAlign: 'center' }}>
-                        <p style={{ fontSize: 16, fontWeight: 600, color: '#0e1d45', marginBottom: 8 }}>У вас пока нет проектов</p>
-                        <p style={{ fontSize: 14, color: '#6b7280' }}>Создайте свой первый проект, чтобы начать работу</p>
+                  <div className={styles.studentTwoPanel}>
+                    <div className={styles.studentLeftPanel}>
+                      <div className={styles.container29}>
+                        {projectsLoading && <div style={{ padding: 12, color: '#6a7282' }}>Загрузка проектов...</div>}
+                        {projects.length === 0 && !projectsLoading && studentTab === 'all' && (
+                          <div style={{ padding: '32px 16px', textAlign: 'center' }}>
+                            <p style={{ fontSize: 16, fontWeight: 600, color: '#0e1d45', marginBottom: 8 }}>У вас пока нет проектов</p>
+                            <p style={{ fontSize: 14, color: '#6a7282' }}>Создайте свой первый проект, чтобы начать работу</p>
+                          </div>
+                        )}
+                        {!projectsLoading && filteredStudentProjects.length === 0 && studentTab !== 'all' && (
+                          <p className={styles.empty}>Нет проектов в этой категории</p>
+                        )}
+                        {filteredStudentProjects.map((p) => (
+                          <ProjectCard
+                            key={p.id}
+                            project={p}
+                            isSelected={p.id === selectedProjectId}
+                            onSelect={() => setSelectedProjectId(p.id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {selectedStudentProject ? (
+                      <div className={styles.studentRightPanel} style={{ position: 'relative' }}>
+                        <button className={styles.studentRightPanelClose} onClick={() => setSelectedProjectId(undefined)}>×</button>
+                        <div className={styles.studentRightPanelTitle}>{selectedStudentProject.title}</div>
+                        <div className={styles.studentRightPanelDesc}>{selectedStudentProject.description || 'Описание проекта'}</div>
+
+                        {/* Status & Dates */}
+                        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 8 }}>
+                          <div>
+                            <div style={{ fontSize: 12, color: '#6a7282', marginBottom: 4 }}>Статус</div>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: '#3B82F6' }}>{STATUS_RU[selectedStudentProject.status || ''] || selectedStudentProject.status}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 12, color: '#6a7282', marginBottom: 4 }}>Дедлайн</div>
+                            <div style={{ fontSize: 14, fontWeight: 500, color: '#1B2559' }}>{formatProjectDate(selectedStudentProject.endDate)}</div>
+                          </div>
+                        </div>
+
+                        {/* Members */}
+                        {isRealProjectId && (
+                          <div className={styles.studentRightPanelSection}>
+                            <div className={styles.studentRightPanelLabel}>Участники ({studentMembers.length})</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+                              {(() => {
+                                const isCurrentUserLeader = studentMembers.some(m => m.userId === userId && m.role === 'LEADER');
+                                return studentMembers.map((m) => {
+                                  const name = m.userName || m.userId.slice(0, 8) + '...';
+                                  const roleLabel = m.role === 'LEADER' ? 'Руководитель' : m.role === 'MENTOR' ? 'Наставник' : m.role === 'OBSERVER' ? 'Наблюдатель' : 'Участник';
+                                  const isMe = m.userId === userId;
+                                  return (
+                                    <div key={m.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: isMe ? '#EFF6FF' : '#F8F9FA', borderRadius: 8, fontSize: 13 }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span style={{ fontWeight: 600, color: '#1B2559' }}>{name}{isMe ? ' (Вы)' : ''}</span>
+                                        <span style={{ fontSize: 11, color: '#64748b', padding: '2px 6px', background: '#e2e8f0', borderRadius: 4 }}>{roleLabel}</span>
+                                      </div>
+                                      {isCurrentUserLeader && m.role !== 'LEADER' && m.userId !== userId && (
+                                        <button
+                                          style={{ background: 'none', border: 'none', color: '#EE5D50', cursor: 'pointer', fontSize: 16, padding: '0 4px' }}
+                                          title="Удалить участника"
+                                          onClick={async () => { try { await removeMember({ projectId: selectedProjectId!, userId: m.userId }).unwrap(); refetchMembers(); } catch {} }}
+                                        >×</button>
+                                      )}
+                                    </div>
+                                  );
+                                });
+                              })()}
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                              <input
+                                style={{ flex: 1, padding: '8px 12px', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: 13 }}
+                                placeholder="Email участника"
+                                value={addMemberEmail}
+                                onChange={(e) => { setAddMemberEmail(e.target.value); setAddMemberError(null); }}
+                              />
+                              <button
+                                style={{ padding: '8px 14px', background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                                onClick={async () => {
+                                  if (!addMemberEmail.trim() || !selectedProjectId) return;
+                                  setAddMemberError(null);
+                                  const found = allUsersForLookup.find(u => u.email === addMemberEmail.trim());
+                                  if (!found) { setAddMemberError('Пользователь не найден'); return; }
+                                  if (studentMembers.some(m => m.userId === found.id)) { setAddMemberError('Уже участник'); return; }
+                                  try {
+                                    await addMember({ projectId: selectedProjectId, userId: found.id, role: 'MEMBER' }).unwrap();
+                                    refetchMembers();
+                                    setAddMemberEmail('');
+                                  } catch { setAddMemberError('Ошибка при добавлении'); }
+                                }}
+                              >+ Добавить</button>
+                            </div>
+                            {addMemberError && <p style={{ color: '#EE5D50', fontSize: 12, marginTop: 4 }}>{addMemberError}</p>}
+                          </div>
+                        )}
+
+                        {/* Kanban Tasks */}
+                        <div className={styles.studentRightPanelSection}>
+                          <div className={styles.studentRightPanelLabel}>Задачи</div>
+                          {taskError && (
+                            <div style={{ padding: '8px 12px', marginBottom: 8, background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, color: '#DC2626', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <span>{taskError}</span>
+                              <button onClick={() => setTaskError(null)} style={{ background: 'none', border: 'none', color: '#DC2626', cursor: 'pointer', fontSize: 16 }}>×</button>
+                            </div>
+                          )}
+                          <div className={styles.projectsPage10}>
+                            <KanbanColumn title="К выполнению" count={grouped.TO_DO.length} tasks={grouped.TO_DO} onAddTask={() => onAddTask('TO_DO')} onDragStart={onDragStartTask} onDrop={() => onDropToColumn('TO_DO')} editingTaskId={editingTaskId} editingTitle={editingTitle} onEditTitleStart={onEditTitleStart} onEditTitleChange={onEditTitleChange} onEditTitleCommit={onEditTitleCommit} onEditTitleCancel={onEditTitleCancel} />
+                            <KanbanColumn title="В процессе" count={grouped.IN_PROGRESS.length} tasks={grouped.IN_PROGRESS} onAddTask={() => onAddTask('IN_PROGRESS')} onDragStart={onDragStartTask} onDrop={() => onDropToColumn('IN_PROGRESS')} editingTaskId={editingTaskId} editingTitle={editingTitle} onEditTitleStart={onEditTitleStart} onEditTitleChange={onEditTitleChange} onEditTitleCommit={onEditTitleCommit} onEditTitleCancel={onEditTitleCancel} />
+                            <KanbanColumn title="На проверке" count={grouped.REVIEW.length} tasks={grouped.REVIEW} onAddTask={() => onAddTask('REVIEW')} onDragStart={onDragStartTask} onDrop={() => onDropToColumn('REVIEW')} editingTaskId={editingTaskId} editingTitle={editingTitle} onEditTitleStart={onEditTitleStart} onEditTitleChange={onEditTitleChange} onEditTitleCommit={onEditTitleCommit} onEditTitleCancel={onEditTitleCancel} />
+                            <KanbanColumn title="Выполнено" count={grouped.DONE.length} tasks={grouped.DONE} onAddTask={() => onAddTask('DONE')} onDragStart={onDragStartTask} onDrop={() => onDropToColumn('DONE')} editingTaskId={editingTaskId} editingTitle={editingTitle} onEditTitleStart={onEditTitleStart} onEditTitleChange={onEditTitleChange} onEditTitleCommit={onEditTitleCommit} onEditTitleCancel={onEditTitleCancel} />
+                            <KanbanColumn title="Заблокировано" count={grouped.BLOCKED.length} tasks={grouped.BLOCKED} onAddTask={() => onAddTask('BLOCKED')} onDragStart={onDragStartTask} onDrop={() => onDropToColumn('BLOCKED')} editingTaskId={editingTaskId} editingTitle={editingTitle} onEditTitleStart={onEditTitleStart} onEditTitleChange={onEditTitleChange} onEditTitleCommit={onEditTitleCommit} onEditTitleCancel={onEditTitleCancel} />
+                          </div>
+                          {tasksLoading && <div style={{ padding: 8, color: '#6a7282', fontSize: 13 }}>Загрузка задач...</div>}
+                          {tasksError && <div style={{ padding: 8, color: '#6a7282', fontSize: 13 }}>API недоступно — режим офлайн.</div>}
+                        </div>
+
+                        {/* Documents */}
+                        {isRealProjectId && (
+                          <div className={styles.studentRightPanelSection}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                              <div className={styles.studentRightPanelLabel} style={{ margin: 0 }}>Документы</div>
+                              <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={uploading}
+                                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: uploading ? 'not-allowed' : 'pointer', color: '#fff', fontSize: 13, fontWeight: 600, background: '#2563eb', border: 'none', padding: '6px 14px', borderRadius: 8, boxShadow: '0 2px 6px rgba(37,99,235,0.3)' }}
+                              >
+                                <img src={AddIcon} style={{ width: 14, height: 14 }} />
+                                {uploading ? 'Загрузка...' : 'Загрузить'}
+                              </button>
+                              <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={onFileUpload} disabled={uploading} />
+                            </div>
+                            {uploadMsg && (
+                              <div style={{ padding: '8px 12px', marginBottom: 8, borderRadius: 8, fontSize: 13, background: uploadMsg.ok ? '#F0FDF4' : '#FEF2F2', color: uploadMsg.ok ? '#16A34A' : '#DC2626' }}>
+                                {uploadMsg.text}
+                              </div>
+                            )}
+                            {docs.length === 0 ? (
+                              <p style={{ color: '#6a7282', fontSize: 13 }}>Нет документов</p>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {docs.map((d) => (
+                                  <div key={d.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: '#F8F9FA', borderRadius: 8 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                      <img src={FileIcon} style={{ width: 16, height: 16 }} />
+                                      <div>
+                                        <div style={{ fontSize: 13, fontWeight: 500, color: '#1B2559' }}>{d.filePath?.split('/').pop()?.replace(/^[a-f0-9-]+_/, '') || d.description || 'Документ'}</div>
+                                        {d.description && <div style={{ fontSize: 11, color: '#6a7282' }}>{d.description}</div>}
+                                      </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 8 }}>
+                                      <img src={DownloadIcon} style={{ width: 16, height: 16, cursor: 'pointer' }} onClick={() => handleDownload(d.id, d.filePath?.split('/').pop()?.replace(/^[a-f0-9-]+_/, '') || d.description || 'document')} />
+                                      <img src={CloseIcon} style={{ width: 16, height: 16, cursor: 'pointer', opacity: 0.5 }} onClick={() => deleteDocument(d.id)} />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className={styles.studentRightPanel} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+                        <div style={{ textAlign: 'center' }}>
+                          <p style={{ fontSize: 16, fontWeight: 600, color: '#1B2559', marginBottom: 4 }}>Выберите проект</p>
+                          <p style={{ fontSize: 14, color: '#6a7282' }}>Нажмите на проект слева, чтобы увидеть детали</p>
+                        </div>
                       </div>
                     )}
-                    {!projectsLoading && filteredStudentProjects.length === 0 && studentTab !== 'all' && (
-                      <p className={styles.empty}>Нет проектов в этой категории</p>
-                    )}
-                    {filteredStudentProjects.map((p) => (
-                      <ProjectCard
-                        key={p.id}
-                        project={p}
-                        onSelect={() => setSelectedProjectId(p.id)}
-                      />
-                    ))}
                   </div>
 
+                  {/* Create Project Modal */}
                   {isCreateOpen && (
                     <div className={styles.modalOverlay} onClick={closeCreateProject}>
                       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
                         <div className={styles.dialogHeader}>
-                          <p className={styles.a}>Создать новый проект</p>
-                          <p className={styles.a3pr}>
-                            Заполните информацию о проекте для начала работы
-                          </p>
+                          <p className={styles.a} style={{ color: '#1B2559' }}>Создать новый проект</p>
+                          <p className={styles.a3pr}>Заполните информацию о проекте для начала работы</p>
                         </div>
                         <div className={styles.projectsPage}>
                           <div className={styles.modalGroup}>
                             <p className={styles.a3pr}>Название проекта</p>
-                            <input
-                              className={styles.modalInput}
-                              placeholder="Введите название проекта"
-                              value={createTitle}
-                              onChange={(e) => setCreateTitle(e.target.value)}
-                            />
+                            <input className={styles.modalInput} placeholder="Введите название проекта" value={createTitle} onChange={(e) => setCreateTitle(e.target.value)} />
                           </div>
                           <div className={styles.modalGroup}>
                             <p className={styles.a3pr}>Описание</p>
-                            <textarea
-                              className={styles.modalTextarea}
-                              placeholder="Опишите цели и задачи проекта"
-                              value={createDescription}
-                              onChange={(e) => setCreateDescription(e.target.value)}
-                            />
+                            <textarea className={styles.modalTextarea} placeholder="Опишите цели и задачи проекта" value={createDescription} onChange={(e) => setCreateDescription(e.target.value)} />
                           </div>
                           <div className={styles.modalRow}>
                             <div className={styles.modalGroupHalf}>
                               <p className={styles.a3pr}>Дедлайн</p>
-                              <input
-                                className={styles.modalInput}
-                                type="date"
-                                value={createEndDate}
-                                onChange={(e) => setCreateEndDate(e.target.value)}
-                              />
+                              <input className={styles.modalInput} type="date" value={createEndDate} onChange={(e) => setCreateEndDate(e.target.value)} />
                             </div>
                             <div className={styles.modalGroupHalf}>
                               <p className={styles.a3pr}>Участники</p>
@@ -780,218 +931,11 @@ const ProjectsPage = () => {
                             </div>
                           </div>
                           <div className={styles.modalActions}>
-                            <button className={styles.btnCancel} onClick={closeCreateProject} disabled={creating}>
-                              Отмена
-                            </button>
-                            <button className={styles.btnCreate} onClick={submitCreateProject} disabled={creating || !createTitle.trim()}>
-                              Создать проект
-                            </button>
+                            <button className={styles.btnCancel} onClick={closeCreateProject} disabled={creating}>Отмена</button>
+                            <button className={styles.btnCreate} onClick={submitCreateProject} disabled={creating || !createTitle.trim()}>Создать проект</button>
                           </div>
                         </div>
-                        <button className={styles.closeButton} onClick={closeCreateProject} aria-label="Закрыть">
-                          ×
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedProjectId ? (
-                    <div className={styles.card7}>
-                      <div className={styles.cardHeader}>
-                        <p className={styles.a19}>Задачи проекта</p>
-                        <p className={styles.aIosAnd2}>
-                          Организация задач в колонках статусов
-                        </p>
-                      </div>
-                      {taskError && (
-                        <div style={{ padding: '8px 16px', marginBottom: 8, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, color: '#dc2626', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span>{taskError}</span>
-                          <button onClick={() => setTaskError(null)} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 16 }}>×</button>
-                        </div>
-                      )}
-                      <div className={styles.projectsPage10}>
-                        <KanbanColumn
-                          title="К выполнению"
-                          count={grouped.TO_DO.length}
-                          tasks={grouped.TO_DO}
-                          onAddTask={() => onAddTask('TO_DO')}
-                          onDragStart={onDragStartTask}
-                          onDrop={() => onDropToColumn('TO_DO')}
-                          editingTaskId={editingTaskId}
-                          editingTitle={editingTitle}
-                          onEditTitleStart={onEditTitleStart}
-                          onEditTitleChange={onEditTitleChange}
-                          onEditTitleCommit={onEditTitleCommit}
-                          onEditTitleCancel={onEditTitleCancel}
-                        />
-                        <KanbanColumn
-                          title="В процессе"
-                          count={grouped.IN_PROGRESS.length}
-                          tasks={grouped.IN_PROGRESS}
-                          onAddTask={() => onAddTask('IN_PROGRESS')}
-                          onDragStart={onDragStartTask}
-                          onDrop={() => onDropToColumn('IN_PROGRESS')}
-                          editingTaskId={editingTaskId}
-                          editingTitle={editingTitle}
-                          onEditTitleStart={onEditTitleStart}
-                          onEditTitleChange={onEditTitleChange}
-                          onEditTitleCommit={onEditTitleCommit}
-                          onEditTitleCancel={onEditTitleCancel}
-                        />
-                        <KanbanColumn
-                          title="На проверке"
-                          count={grouped.REVIEW.length}
-                          tasks={grouped.REVIEW}
-                          onAddTask={() => onAddTask('REVIEW')}
-                          onDragStart={onDragStartTask}
-                          onDrop={() => onDropToColumn('REVIEW')}
-                          editingTaskId={editingTaskId}
-                          editingTitle={editingTitle}
-                          onEditTitleStart={onEditTitleStart}
-                          onEditTitleChange={onEditTitleChange}
-                          onEditTitleCommit={onEditTitleCommit}
-                          onEditTitleCancel={onEditTitleCancel}
-                        />
-                        <KanbanColumn
-                          title="Выполнено"
-                          count={grouped.DONE.length}
-                          tasks={grouped.DONE}
-                          onAddTask={() => onAddTask('DONE')}
-                          onDragStart={onDragStartTask}
-                          onDrop={() => onDropToColumn('DONE')}
-                          editingTaskId={editingTaskId}
-                          editingTitle={editingTitle}
-                          onEditTitleStart={onEditTitleStart}
-                          onEditTitleChange={onEditTitleChange}
-                          onEditTitleCommit={onEditTitleCommit}
-                          onEditTitleCancel={onEditTitleCancel}
-                        />
-                        <KanbanColumn
-                          title="Заблокировано"
-                          count={grouped.BLOCKED.length}
-                          tasks={grouped.BLOCKED}
-                          onAddTask={() => onAddTask('BLOCKED')}
-                          onDragStart={onDragStartTask}
-                          onDrop={() => onDropToColumn('BLOCKED')}
-                          editingTaskId={editingTaskId}
-                          editingTitle={editingTitle}
-                          onEditTitleStart={onEditTitleStart}
-                          onEditTitleChange={onEditTitleChange}
-                          onEditTitleCommit={onEditTitleCommit}
-                          onEditTitleCancel={onEditTitleCancel}
-                        />
-                      </div>
-                      {tasksLoading && <div style={{ padding: 12 }}>Загрузка задач...</div>}
-                      {tasksError && <div style={{ padding: 12 }}>API недоступно — режим офлайн.</div>}
-
-                      {isRealProjectId && (
-                        <div style={{ marginTop: 20, padding: '16px 0', borderTop: '1px solid #f1f5f9' }}>
-                          <p className={styles.a19} style={{ marginBottom: 10 }}>Участники проекта ({studentMembers.length})</p>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
-                            {(() => {
-                              const isCurrentUserLeader = studentMembers.some(m => m.userId === userId && m.role === 'LEADER');
-                              return studentMembers.map((m) => {
-                              const name = m.userName || m.userId.slice(0, 8) + '...';
-                              const roleLabel = m.role === 'LEADER' ? 'Руководитель' : m.role === 'MENTOR' ? 'Наставник' : m.role === 'OBSERVER' ? 'Наблюдатель' : 'Участник';
-                              const isMe = m.userId === userId;
-                              return (
-                                <div key={m.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: isMe ? '#eff6ff' : '#f8fafc', borderRadius: 8, fontSize: 13 }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <span style={{ fontWeight: 600, color: '#0e1d45' }}>{name}{isMe ? ' (Вы)' : ''}</span>
-                                    <span style={{ fontSize: 11, color: '#64748b', padding: '2px 6px', background: '#e2e8f0', borderRadius: 4 }}>{roleLabel}</span>
-                                  </div>
-                                  {isCurrentUserLeader && m.role !== 'LEADER' && m.userId !== userId && (
-                                    <button
-                                      style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 16, padding: '0 4px' }}
-                                      title="Удалить участника"
-                                      onClick={async () => { try { await removeMember({ projectId: selectedProjectId!, userId: m.userId }).unwrap(); refetchMembers(); } catch {} }}
-                                    >×</button>
-                                  )}
-                                </div>
-                              );
-                            });
-                            })()}
-                          </div>
-                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                            <input
-                              style={{ flex: 1, padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13 }}
-                              placeholder="Email участника"
-                              value={addMemberEmail}
-                              onChange={(e) => { setAddMemberEmail(e.target.value); setAddMemberError(null); }}
-                            />
-                            <button
-                              style={{ padding: '8px 16px', background: '#3a76f0', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}
-                              onClick={async () => {
-                                if (!addMemberEmail.trim() || !selectedProjectId) return;
-                                setAddMemberError(null);
-                                // Find user by email from loaded users
-                                const found = allUsersForLookup.find(u => u.email === addMemberEmail.trim());
-                                if (!found) { setAddMemberError('Пользователь не найден'); return; }
-                                if (studentMembers.some(m => m.userId === found.id)) { setAddMemberError('Уже участник'); return; }
-                                try {
-                                  await addMember({ projectId: selectedProjectId, userId: found.id, role: 'MEMBER' }).unwrap();
-                                  refetchMembers();
-                                  setAddMemberEmail('');
-                                } catch { setAddMemberError('Ошибка при добавлении'); }
-                              }}
-                            >+ Добавить</button>
-                          </div>
-                          {addMemberError && <p style={{ color: '#dc2626', fontSize: 12, marginTop: 4 }}>{addMemberError}</p>}
-                        </div>
-                      )}
-
-                      {isRealProjectId && (
-                        <div style={{ marginTop: 20, padding: '16px 0', borderTop: '1px solid #f1f5f9' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                            <p className={styles.a19}>Документы проекта</p>
-                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: '#3a76f0', fontSize: 14, fontWeight: 500 }}>
-                              <img src={AddIcon} style={{ width: 16, height: 16 }} />
-                              {uploading ? 'Загрузка...' : 'Загрузить файл'}
-                              <input type="file" style={{ display: 'none' }} onChange={onFileUpload} disabled={uploading} />
-                            </label>
-                          </div>
-                          {uploadMsg && (
-                            <div style={{ padding: '8px 12px', marginBottom: 8, borderRadius: 8, fontSize: 13, background: uploadMsg.ok ? '#f0fdf4' : '#fef2f2', color: uploadMsg.ok ? '#16a34a' : '#dc2626' }}>
-                              {uploadMsg.text}
-                            </div>
-                          )}
-                          {docs.length === 0 ? (
-                            <p style={{ color: '#94a3b8', fontSize: 14 }}>Нет документов</p>
-                          ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                              {docs.map((d) => (
-                                <div key={d.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#f8fafc', borderRadius: 8 }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                    <img src={FileIcon} style={{ width: 18, height: 18 }} />
-                                    <div>
-                                      <div style={{ fontSize: 14, fontWeight: 500, color: '#0e1d45' }}>{d.filePath?.split('/').pop()?.replace(/^[a-f0-9-]+_/, '') || d.description || 'Документ'}</div>
-                                      {d.description && <div style={{ fontSize: 12, color: '#94a3b8' }}>{d.description}</div>}
-                                    </div>
-                                  </div>
-                                  <div style={{ display: 'flex', gap: 8 }}>
-                                    <img
-                                      src={DownloadIcon}
-                                      style={{ width: 18, height: 18, cursor: 'pointer' }}
-                                      onClick={() => handleDownload(d.id, d.filePath?.split('/').pop()?.replace(/^[a-f0-9-]+_/, '') || d.description || 'document')}
-                                    />
-                                    <img
-                                      src={CloseIcon}
-                                      style={{ width: 18, height: 18, cursor: 'pointer', opacity: 0.5 }}
-                                      onClick={() => deleteDocument(d.id)}
-                                    />
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className={styles.card7}>
-                      <div className={styles.cardHeader}>
-                        <p className={styles.a19}>Задачи проекта</p>
-                        <p className={styles.aIosAnd2}>Выберите проект, чтобы увидеть задачи</p>
+                        <button className={styles.closeButton} onClick={closeCreateProject} aria-label="Закрыть">×</button>
                       </div>
                     </div>
                   )}
@@ -1005,140 +949,145 @@ const ProjectsPage = () => {
   );
 };
 
-const HeadProjectCard = ({ project, onOpen }: { project: HeadProject; onOpen: () => void }) => {
+/* ═══ HEAD SUB-COMPONENTS ═══ */
+
+const HeadProjectCard = ({ project, position, onOpen }: { project: HeadProject; position: number; onOpen: () => void }) => {
+  const posClass = position === 1 ? styles.headPositionGold
+    : position === 2 ? styles.headPositionSilver
+    : position === 3 ? styles.headPositionBronze
+    : '';
+
   return (
     <div className={styles.headCard} role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onOpen()}>
-      <div className={styles.headCardTop}>
-        <div className={styles.headCardTitleRow}>
-          <div className={styles.headCardTitle}>
-            {project.title}
-            {project.isAwarded && (
-              <span className={styles.headAwardMark}>
-                <img src={AwardIcon} className={styles.headAwardIcon} />
+      <div className={styles.headCardRow}>
+        <div className={`${styles.headPositionNumber} ${posClass}`}>#{position}</div>
+        <div className={styles.headCardTop}>
+          <div className={styles.headCardTitleRow}>
+            <div className={styles.headCardTitle}>
+              {project.title}
+              {project.isAwarded && (
+                <span className={styles.headAwardMark}>
+                  <img src={AwardIcon} className={styles.headAwardIcon} />
+                </span>
+              )}
+            </div>
+            <div className={styles.headCardLeader}>Руководитель: {project.curator}</div>
+          </div>
+
+          <div className={styles.headCardDesc}>{project.description}</div>
+
+          <div className={styles.headCardMetaRow}>
+            <div className={styles.headCardChips}>
+              <span className={styles.headChip}>{project.typeLabel}</span>
+              <span className={styles.headMetaPill}>
+                <img src={PeopleIcon} className={styles.headMetaImgIcon} />
+                {project.memberCount}
               </span>
-            )}
+              <span className={styles.headMetaPill}>
+                {project.tasksDone}/{project.tasksTotal} задач
+              </span>
+            </div>
           </div>
-          <div className={styles.headCardLeader}>Руководитель: {project.curator}</div>
-        </div>
 
-        <div className={styles.headCardDesc}>{project.description}</div>
-
-        <div className={styles.headCardMetaRow}>
-          <div className={styles.headCardChips}>
-            <span className={styles.headChip}>{project.typeLabel}</span>
-            <span className={styles.headMetaPill}>
-              <img src={PeopleIcon} className={styles.headMetaImgIcon} />
-              {project.memberCount}
-            </span>
-            <span className={styles.headMetaPill}>
-              {project.tasksDone}/{project.tasksTotal} задач
-            </span>
+          <div className={styles.headTeamRow}>
+            <div className={styles.headAvatars}>
+              {project.members.slice(0, 3).map((m) => (
+                <div key={m.name} className={styles.headAvatar} title={m.name}>
+                  {m.initials}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
 
-        <div className={styles.headTeamRow}>
-          <div className={styles.headAvatars}>
-            {project.members.slice(0, 3).map((m) => (
-              <div key={m.name} className={styles.headAvatar} title={m.name}>
-                {m.initials}
-              </div>
-            ))}
+          <div className={styles.headScoreRow}>
+            <div className={styles.headScoreLabel}>Прогресс</div>
+            <div className={styles.headScoreValue}>{project.progress}%</div>
           </div>
-        </div>
-
-        <div className={styles.headScoreRow}>
-          <div className={styles.headScoreLabel}>Прогресс</div>
-          <div className={styles.headScoreValue}>{project.progress}%</div>
-        </div>
-        <div className={styles.headScoreBar}>
-          <div className={styles.headScoreFill} style={{ width: `${clamp(project.progress, 0, 100)}%` }} />
+          <div className={styles.headScoreBar}>
+            <div className={styles.headScoreFill} style={{ width: `${clamp(project.progress, 0, 100)}%` }} />
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-const HeadProjectModal = ({ project, onClose }: { project: HeadProject; onClose: () => void }) => {
+const HeadProjectPanel = ({ project, onClose }: { project: HeadProject; onClose: () => void }) => {
   const onView = () => window.alert('Просмотр проекта в разработке');
   const onDownload = () => window.alert('Скачивание проекта в разработке');
 
   return (
-    <div className={styles.headModalOverlay} onClick={onClose}>
-      <div className={styles.headModal} onClick={(e) => e.stopPropagation()}>
-        <div className={styles.headModalTop}>
-          <div className={styles.headModalPills}>
-            <span className={styles.headPill}>{project.typeLabel}</span>
-            {project.isAwarded && (
-              <span className={`${styles.headPill} ${styles.headPillAward}`}>
-                <img src={AwardIcon} className={styles.headPillIcon} />
-                Награжден
-              </span>
-            )}
-          </div>
-
-          <div className={styles.headModalActions}>
-            <button type="button" className={styles.headActionBtn} onClick={onView}>
-              <img src={EyeIcon} className={styles.headActionIcon} />
-              Просмотр
-            </button>
-            <button type="button" className={styles.headActionBtn} onClick={onDownload}>
-              <img src={DownloadIcon} className={styles.headActionIcon} />
-              Скачать
-            </button>
-            <button type="button" className={styles.headCloseBtn} onClick={onClose} aria-label="Закрыть">
-              ×
-            </button>
-          </div>
+    <div className={styles.headModal}>
+      <div className={styles.headModalTop}>
+        <div className={styles.headModalPills}>
+          <span className={styles.headPill}>{project.typeLabel}</span>
+          {project.isAwarded && (
+            <span className={`${styles.headPill} ${styles.headPillAward}`}>
+              <img src={AwardIcon} className={styles.headPillIcon} />
+              Награжден
+            </span>
+          )}
         </div>
-
-        <div className={styles.headModalTitle}>{project.title}</div>
-        <div className={styles.headModalDesc}>{project.description}</div>
-
-        <div className={styles.headSectionTitle}>Команда проекта</div>
-        <div className={styles.headTeamGrid}>
-          {project.members.map((m) => (
-            <div key={m.name} className={styles.headMemberCard}>
-              <div className={styles.headMemberAvatar}>{m.initials}</div>
-              <div className={styles.headMemberInfo}>
-                <div className={styles.headMemberName}>{m.name}</div>
-                <div className={styles.headMemberRole}>{m.role}</div>
-              </div>
-            </div>
-          ))}
+        <div className={styles.headModalActions}>
+          <button type="button" className={styles.headActionBtn} onClick={onView}>
+            <img src={EyeIcon} className={styles.headActionIcon} />
+            Просмотр
+          </button>
+          <button type="button" className={styles.headActionBtn} onClick={onDownload}>
+            <img src={DownloadIcon} className={styles.headActionIcon} />
+            Скачать
+          </button>
+          <button type="button" className={styles.headCloseBtn} onClick={onClose} aria-label="Закрыть">×</button>
         </div>
+      </div>
 
-        <div className={styles.headLeaderLine}>Научный руководитель: {project.curator}</div>
+      <div className={styles.headModalTitle}>{project.title}</div>
+      <div className={styles.headModalDesc}>{project.description}</div>
 
-        <div className={styles.headSectionTitle}>Прогресс</div>
-        <div className={styles.headCriteria}>
-          <div className={styles.headCriteriaRow}>
-            <div className={styles.headCriteriaTop}>
-              <div className={styles.headCriteriaLabel}>Выполнение задач</div>
-              <div className={styles.headCriteriaValue}>{project.tasksDone}/{project.tasksTotal}</div>
-            </div>
-            <div className={styles.headCriteriaBar}>
-              <div className={styles.headCriteriaFill} style={{ width: `${clamp(project.progress, 0, 100)}%` }} />
+      <div className={styles.headSectionTitle}>Команда проекта</div>
+      <div className={styles.headTeamGrid}>
+        {project.members.map((m) => (
+          <div key={m.name} className={styles.headMemberCard}>
+            <div className={styles.headMemberAvatar}>{m.initials}</div>
+            <div className={styles.headMemberInfo}>
+              <div className={styles.headMemberName}>{m.name}</div>
+              <div className={styles.headMemberRole}>{m.role}</div>
             </div>
           </div>
-        </div>
+        ))}
+      </div>
 
-        <div className={styles.headBottomKpis}>
-          <div className={styles.headKpiCard}>
-            <div className={styles.headKpiValueBlue}>{project.progress}%</div>
-            <div className={styles.headKpiLabel}>Прогресс</div>
+      <div className={styles.headLeaderLine}>Научный руководитель: {project.curator}</div>
+
+      <div className={styles.headSectionTitle}>Прогресс</div>
+      <div className={styles.headCriteria}>
+        <div className={styles.headCriteriaRow}>
+          <div className={styles.headCriteriaTop}>
+            <div className={styles.headCriteriaLabel}>Выполнение задач</div>
+            <div className={styles.headCriteriaValue}>{project.tasksDone}/{project.tasksTotal}</div>
           </div>
-          <div className={styles.headKpiCard}>
-            <div className={styles.headKpiValueOrange}>{project.tasksDone}</div>
-            <div className={styles.headKpiLabel}>Задач выполнено</div>
+          <div className={styles.headCriteriaBar}>
+            <div className={styles.headCriteriaFill} style={{ width: `${clamp(project.progress, 0, 100)}%` }} />
           </div>
-          <div className={styles.headKpiCard}>
-            <div className={styles.headKpiValueBlue}>{project.tasksTotal}</div>
-            <div className={styles.headKpiLabel}>Всего задач</div>
-          </div>
-          <div className={styles.headKpiCard}>
-            <div className={styles.headKpiValueGreen}>{project.memberCount}</div>
-            <div className={styles.headKpiLabel}>Участников</div>
-          </div>
+        </div>
+      </div>
+
+      <div className={styles.headBottomKpis}>
+        <div className={styles.headKpiCard}>
+          <div className={styles.headKpiValueBlue}>{project.progress}%</div>
+          <div className={styles.headKpiLabel}>Прогресс</div>
+        </div>
+        <div className={styles.headKpiCard}>
+          <div className={styles.headKpiValueOrange}>{project.tasksDone}</div>
+          <div className={styles.headKpiLabel}>Задач выполнено</div>
+        </div>
+        <div className={styles.headKpiCard}>
+          <div className={styles.headKpiValueBlue}>{project.tasksTotal}</div>
+          <div className={styles.headKpiLabel}>Всего задач</div>
+        </div>
+        <div className={styles.headKpiCard}>
+          <div className={styles.headKpiValueGreen}>{project.memberCount}</div>
+          <div className={styles.headKpiLabel}>Участников</div>
         </div>
       </div>
     </div>
@@ -1147,16 +1096,12 @@ const HeadProjectModal = ({ project, onClose }: { project: HeadProject; onClose:
 
 const HeadTrendIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path
-      d="M4 16.5L10 10.5L13.5 14L20 7.5"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
+    <path d="M4 16.5L10 10.5L13.5 14L20 7.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     <path d="M16.5 7.5H20V11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
+
+/* ═══ TEACHER SUB-COMPONENTS ═══ */
 
 const TeacherProjectCard = ({ project, onOpen }: { project: TeacherProject; onOpen: () => void }) => {
   const statusClass =
@@ -1210,7 +1155,7 @@ const TeacherProjectCard = ({ project, onOpen }: { project: TeacherProject; onOp
   );
 };
 
-const TeacherProjectModal = ({
+const TeacherProjectPanel = ({
   project,
   commentDraft,
   onChangeComment,
@@ -1250,121 +1195,121 @@ const TeacherProjectModal = ({
   };
 
   return (
-    <div className={styles.teacherModalOverlay} onClick={onClose}>
-      <div className={styles.teacherModal} onClick={(e) => e.stopPropagation()}>
-        <button className={styles.teacherModalClose} type="button" onClick={onClose} aria-label="Закрыть">
-          <img src={CloseIcon} className={styles.teacherModalCloseIcon} />
+    <div className={styles.teacherModal}>
+      <button className={styles.teacherModalClose} type="button" onClick={onClose} aria-label="Закрыть">
+        <img src={CloseIcon} className={styles.teacherModalCloseIcon} />
+      </button>
+
+      <div className={styles.teacherModalTopRow}>
+        <div className={styles.teacherModalPills}>
+          <span className={styles.teacherTypePill} style={{ background: '#F8F9FA', border: '1px solid #E2E8F0', color: '#1B2559' }}>{project.typeLabel}</span>
+          <span className={`${styles.teacherStatusPill} ${statusClass}`}>{project.statusLabel}</span>
+        </div>
+        <button className={styles.teacherOpenBtn} type="button" onClick={openProject}>
+          <img src={EyeIcon} className={styles.teacherOpenIcon} />
+          Открыть
         </button>
+      </div>
 
-        <div className={styles.teacherModalTopRow}>
-          <div className={styles.teacherModalPills}>
-            <span className={styles.teacherTypePill}>{project.typeLabel}</span>
-            <span className={`${styles.teacherStatusPill} ${statusClass}`}>{project.statusLabel}</span>
-          </div>
-          <button className={styles.teacherOpenBtn} type="button" onClick={openProject}>
-            <img src={EyeIcon} className={styles.teacherOpenIcon} />
-            Открыть проект
-          </button>
-        </div>
+      <div className={styles.teacherModalTitle}>{project.title}</div>
+      <div className={styles.teacherModalDesc}>{project.description}</div>
 
-        <div className={styles.teacherModalTitle}>{project.title}</div>
-        <div className={styles.teacherModalDesc}>{project.description}</div>
-
-        <div className={styles.teacherSectionTitle}>Команда проекта</div>
-        <div className={styles.teacherTeamGrid}>
-          {displayMembers.length === 0 && <p style={{ color: '#737373', fontSize: 14 }}>Нет участников</p>}
-          {displayMembers.map((m) => (
-            <div key={m.name} className={styles.teacherTeamCard}>
-              <div className={styles.teacherTeamAvatar}>{m.initials}</div>
-              <div>
-                <div className={styles.teacherTeamName}>{m.name}</div>
-                <div className={styles.teacherTeamRole}>{m.role}</div>
-              </div>
+      <div className={styles.teacherSectionTitle}>Команда проекта</div>
+      <div className={styles.teacherTeamGrid}>
+        {displayMembers.length === 0 && <p style={{ color: '#6a7282', fontSize: 13 }}>Нет участников</p>}
+        {displayMembers.map((m) => (
+          <div key={m.name} className={styles.teacherTeamCard}>
+            <div className={styles.teacherTeamAvatar}>{m.initials}</div>
+            <div>
+              <div className={styles.teacherTeamName}>{m.name}</div>
+              <div className={styles.teacherTeamRole}>{m.role}</div>
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
+      </div>
 
-        <div className={styles.teacherStatsGrid}>
-          <div className={styles.teacherStatBox}>
-            <div className={styles.teacherStatLabel}>Прогресс</div>
-            <div className={styles.teacherStatValueBlue}>{project.progress}%</div>
-          </div>
-          <div className={styles.teacherStatBox}>
-            <div className={styles.teacherStatLabel}>Задачи</div>
-            <div className={styles.teacherStatValue}>{project.tasksDone}/{project.tasksTotal}</div>
-          </div>
-          <div className={styles.teacherStatBox}>
-            <div className={styles.teacherStatLabel}>Дата начала</div>
-            <div className={styles.teacherStatValue}>{project.startDate}</div>
-          </div>
-          <div className={styles.teacherStatBox}>
-            <div className={styles.teacherStatLabel}>Дедлайн</div>
-            <div className={styles.teacherStatValue}>{project.deadline}</div>
-          </div>
+      <div className={styles.teacherStatsGrid}>
+        <div className={styles.teacherStatBox}>
+          <div className={styles.teacherStatLabel}>Прогресс</div>
+          <div className={styles.teacherStatValueBlue}>{project.progress}%</div>
         </div>
+        <div className={styles.teacherStatBox}>
+          <div className={styles.teacherStatLabel}>Задачи</div>
+          <div className={styles.teacherStatValue}>{project.tasksDone}/{project.tasksTotal}</div>
+        </div>
+        <div className={styles.teacherStatBox}>
+          <div className={styles.teacherStatLabel}>Дата начала</div>
+          <div className={styles.teacherStatValue}>{project.startDate}</div>
+        </div>
+        <div className={styles.teacherStatBox}>
+          <div className={styles.teacherStatLabel}>Дедлайн</div>
+          <div className={styles.teacherStatValue}>{project.deadline}</div>
+        </div>
+      </div>
 
-        <div className={styles.teacherSectionTitle}>Задачи проекта ({tasks?.length || 0})</div>
-        <div className={styles.teacherStages}>
-          {(!tasks || tasks.length === 0) && <p style={{ color: '#94a3b8', fontSize: 13 }}>Нет задач</p>}
-          {tasks?.map((t) => {
-            const done = t.status === 'DONE';
-            const statusLabel = t.status === 'TO_DO' ? 'К выполнению' : t.status === 'IN_PROGRESS' ? 'В работе' : t.status === 'REVIEW' ? 'На проверке' : t.status === 'DONE' ? 'Выполнена' : 'Заблокирована';
-            return (
-              <div key={t.id} className={styles.teacherStageRow}>
-                <div className={done ? styles.teacherStageDotDone : styles.teacherStageDotTodo}>
-                  {done ? '✓' : '○'}
-                </div>
-                <div className={styles.teacherStageTitle}>{t.title}</div>
-                <div className={styles.teacherStageDate}>{statusLabel}</div>
+      <div className={styles.teacherSectionTitle}>Задачи проекта ({tasks?.length || 0})</div>
+      <div className={styles.teacherStages}>
+        {(!tasks || tasks.length === 0) && <p style={{ color: '#6a7282', fontSize: 13 }}>Нет задач</p>}
+        {tasks?.map((t) => {
+          const done = t.status === 'DONE';
+          const statusLabel = t.status === 'TO_DO' ? 'К выполнению' : t.status === 'IN_PROGRESS' ? 'В работе' : t.status === 'REVIEW' ? 'На проверке' : t.status === 'DONE' ? 'Выполнена' : 'Заблокирована';
+          return (
+            <div key={t.id} className={styles.teacherStageRow}>
+              <div className={done ? styles.teacherStageDotDone : styles.teacherStageDotTodo}>
+                {done ? '✓' : '○'}
               </div>
-            );
-          })}
-        </div>
-
-        {documents && documents.length > 0 && (
-          <>
-            <div className={styles.teacherSectionTitle}>Документы ({documents.length})</div>
-            <div className={styles.teacherStages}>
-              {documents.map((d) => (
-                <div key={d.id} className={styles.teacherStageRow}>
-                  <div className={styles.teacherStageDotDone}>📄</div>
-                  <div className={styles.teacherStageTitle}>{d.description || d.filePath}</div>
-                  <div className={styles.teacherStageDate}>{d.createdAt ? new Date(d.createdAt).toLocaleDateString('ru-RU') : ''}</div>
-                </div>
-              ))}
+              <div className={styles.teacherStageTitle}>{t.title}</div>
+              <div className={styles.teacherStageDate}>{statusLabel}</div>
             </div>
-          </>
-        )}
+          );
+        })}
+      </div>
 
-        <div className={styles.teacherSectionTitle}>Комментарий преподавателя</div>
-        <textarea
-          className={styles.teacherComment}
-          placeholder="Добавьте комментарий или рекомендации для студентов..."
-          value={commentDraft}
-          onChange={(e) => onChangeComment(e.target.value)}
-        />
+      {documents && documents.length > 0 && (
+        <>
+          <div className={styles.teacherSectionTitle}>Документы ({documents.length})</div>
+          <div className={styles.teacherStages}>
+            {documents.map((d) => (
+              <div key={d.id} className={styles.teacherStageRow}>
+                <div className={styles.teacherStageDotDone}>📄</div>
+                <div className={styles.teacherStageTitle}>{d.description || d.filePath}</div>
+                <div className={styles.teacherStageDate}>{d.createdAt ? new Date(d.createdAt).toLocaleDateString('ru-RU') : ''}</div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
-        <div className={styles.teacherModalActions}>
-          <button className={styles.teacherPrimaryBtn} type="button" onClick={onSendComment}>
-            Отправить комментарий
-          </button>
-          <button className={styles.teacherSecondaryBtn} type="button" onClick={requestReport}>
-            <img src={FileIcon} className={styles.teacherSecondaryIcon} />
-            Запросить отчет
-          </button>
-        </div>
+      <div className={styles.teacherSectionTitle}>Комментарий преподавателя</div>
+      <textarea
+        className={styles.teacherComment}
+        placeholder="Добавьте комментарий или рекомендации для студентов..."
+        value={commentDraft}
+        onChange={(e) => onChangeComment(e.target.value)}
+      />
+
+      <div className={styles.teacherModalActions}>
+        <button className={styles.teacherPrimaryBtn} type="button" onClick={onSendComment}>
+          Отправить комментарий
+        </button>
+        <button className={styles.teacherSecondaryBtn} type="button" onClick={requestReport}>
+          <img src={FileIcon} className={styles.teacherSecondaryIcon} />
+          Запросить отчет
+        </button>
       </div>
     </div>
   );
 };
 
-const ProjectCard = ({ project, onSelect }: { project: ProjectDto; onSelect: () => void }) => {
+/* ═══ STUDENT SUB-COMPONENTS ═══ */
+
+const ProjectCard = ({ project, isSelected, onSelect }: { project: ProjectDto; isSelected?: boolean; onSelect: () => void }) => {
   const isReal = project.id && !project.id.startsWith('demo-') && !project.id.startsWith('local-');
   const { data: membersResp } = useGetProjectMembersQuery(project.id, { skip: !isReal });
   const memberCount = membersResp?.data?.length ?? 0;
 
   return (
-    <div className={styles.card}>
+    <div className={styles.card} style={isSelected ? { borderColor: '#3B82F6' } : undefined} onClick={onSelect}>
       <div className={styles.projectsPage}>
         <div className={styles.container9}>
           <div className={styles.cardTitle}>
@@ -1373,11 +1318,6 @@ const ProjectCard = ({ project, onSelect }: { project: ProjectDto; onSelect: () 
           <div className={styles.cardDescription}>
             <p className={styles.aIosAnd}>{project.description}</p>
           </div>
-        </div>
-        <div className={styles.icon5}>
-          <div className={styles.vector5} />
-          <div className={styles.vector6} />
-          <div className={styles.vector6} />
         </div>
       </div>
       <div className={styles.projectsPage2}>
@@ -1389,9 +1329,6 @@ const ProjectCard = ({ project, onSelect }: { project: ProjectDto; onSelect: () 
             <div className={styles.text11}>
               <p className={styles.a65}>{STATUS_RU[project.status || ''] || project.status}</p>
             </div>
-          </div>
-          <div className={styles.primitiveDiv2}>
-            <div className={styles.container11} />
           </div>
         </div>
         <div className={styles.container15}>
@@ -1407,9 +1344,6 @@ const ProjectCard = ({ project, onSelect }: { project: ProjectDto; onSelect: () 
               <p className={styles.a17}>{formatProjectDate(project.endDate)}</p>
             </div>
           </div>
-          <button className={styles.primitiveButton} onClick={onSelect}>
-            <p className={styles.a12}>Открыть</p>
-          </button>
         </div>
       </div>
     </div>
@@ -1489,11 +1423,6 @@ const KanbanColumn = ({
                       {t.title}
                     </p>
                   )}
-                </div>
-                <div className={styles.icon8}>
-                  <div className={styles.vector5} />
-                  <div className={styles.vector6} />
-                  <div className={styles.vector6} />
                 </div>
               </div>
               <div className={styles.badge3}>

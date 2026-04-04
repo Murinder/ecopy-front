@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import styles from './SchedulePage.module.scss';
 import Sidebar from '../../components/Sidebar';
 import BellIcon from '../../assets/icons/mjbmqg4r-fcbhx7k.svg';
+import NotificationBell from '../../components/NotificationPanel';
 import AddIcon from '../../assets/icons/mjbmqg4r-6km8pgq.svg';
 import CloseIcon from '../../assets/icons/ui-close.svg';
 import CalendarIcon from '../../assets/icons/ui-calendar.svg';
@@ -288,7 +289,7 @@ const TeacherScheduleView = ({ avatarInitials, userId }: { avatarInitials: strin
               Добавить занятие
             </button>
             <div className={styles.notif}>
-              <img src={BellIcon} className={styles.notifIcon} />
+              <NotificationBell iconSrc={BellIcon} />
             </div>
             <div className={styles.avatar}>{avatarInitials}</div>
           </div>
@@ -683,7 +684,7 @@ const HeadDefenseScheduleView = ({ avatarInitials, userId }: { avatarInitials: s
           </div>
           <div className={styles.topActions}>
             <div className={styles.notif}>
-              <img src={BellIcon} className={styles.notifIcon} />
+              <NotificationBell iconSrc={BellIcon} />
             </div>
             <div className={styles.avatar}>{avatarInitials}</div>
           </div>
@@ -1033,7 +1034,7 @@ const SchedulePage = () => {
             </div>
             <div className={styles.topActions}>
               <div className={styles.notif}>
-                <img src={BellIcon} className={styles.notifIcon} />
+                <NotificationBell iconSrc={BellIcon} />
                 </div>
               <div className={styles.avatar}>{initials}</div>
             </div>

@@ -1,7 +1,8 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styles from './ProfilePage.module.scss';
 import BellIcon from '../../assets/icons/mjbmqg4r-fcbhx7k.svg';
+import NotificationBell from '../../components/NotificationPanel';
 import EditIcon from '../../assets/icons/ui-edit.svg';
 import SaveIcon from '../../assets/icons/ui-save.svg';
 import MailIcon from '../../assets/icons/ui-mail.svg';
@@ -379,7 +380,7 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
           </div>
           <div className={styles.topActions}>
             <div className={styles.notif}>
-              <img src={BellIcon} className={styles.notifIcon} />
+              <NotificationBell iconSrc={BellIcon} />
             </div>
             <div className={styles.avatarSmall}>{initials}</div>
           </div>
@@ -747,6 +748,7 @@ const DocumentsSection = ({ userId }: { userId: string }) => {
   const [deleteUserDocument] = useDeleteUserDocumentMutation();
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -799,7 +801,10 @@ const DocumentsSection = ({ userId }: { userId: string }) => {
     <div className={styles.card} style={{ gridColumn: '1 / -1' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <div className={styles.cardTitle}>Мои документы</div>
-        <label
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -812,11 +817,12 @@ const DocumentsSection = ({ userId }: { userId: string }) => {
             fontWeight: 600,
             cursor: uploading ? 'not-allowed' : 'pointer',
             opacity: uploading ? 0.6 : 1,
+            border: 'none',
           }}
         >
-          <input type="file" onChange={handleUpload} style={{ display: 'none' }} disabled={uploading} />
           {uploading ? 'Загрузка...' : '+ Загрузить'}
-        </label>
+        </button>
+        <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleUpload} disabled={uploading} />
       </div>
       {uploadError && <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 8 }}>{uploadError}</p>}
       {documents.length === 0 && (
@@ -988,7 +994,7 @@ const HeadProfileView = ({ userName, userId }: { userName: string; userId: strin
           </div>
           <div className={styles.topActions}>
             <div className={styles.notif}>
-              <img src={BellIcon} className={styles.notifIcon} />
+              <NotificationBell iconSrc={BellIcon} />
             </div>
             <div className={styles.avatarSmall}>{initials}</div>
           </div>
@@ -1392,7 +1398,7 @@ const TeacherProfileView = ({ userName, userId }: { userName: string; userId: st
           </div>
           <div className={styles.topActions}>
             <div className={styles.notif}>
-              <img src={BellIcon} className={styles.notifIcon} />
+              <NotificationBell iconSrc={BellIcon} />
             </div>
             <div className={styles.avatarSmall}>{initials}</div>
           </div>

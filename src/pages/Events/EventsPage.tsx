@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import styles from './EventsPage.module.scss';
 import Sidebar from '../../components/Sidebar';
 import BellIcon from '../../assets/icons/mjbmqg4r-fcbhx7k.svg';
+import NotificationBell from '../../components/NotificationPanel';
 import PeopleIcon from '../../assets/icons/mjbmqg4r-g71l6vp.svg';
 import CalendarIcon from '../../assets/icons/mjbmqg4r-fgt12s1.svg';
 import ScheduleIcon from '../../assets/icons/mjbmnzii-lc4urbp.svg';
@@ -338,7 +339,7 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
             </div>
             <div className={styles.topActions}>
               <div className={styles.notif}>
-                <img src={BellIcon} className={styles.notifIcon} />
+                <NotificationBell iconSrc={BellIcon} />
               </div>
               <div className={styles.avatar}>{avatarInitials}</div>
             </div>
@@ -848,7 +849,7 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
             </div>
               <div className={styles.topActions}>
                 <div className={styles.notif}>
-                  <img src={BellIcon} className={styles.notifIcon} />
+                  <NotificationBell iconSrc={BellIcon} />
                 </div>
               <div className={styles.avatar}>{avatarInitials}</div>
               </div>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import styles from './ReportsPage.module.scss';
 import BellIcon from '../../assets/icons/mjbmqg4r-fcbhx7k.svg';
+import NotificationBell from '../../components/NotificationPanel';
 import AddIcon from '../../assets/icons/mjbmqg4r-6km8pgq.svg';
 import CalendarIcon from '../../assets/icons/mjbmqg4r-fgt12s1.svg';
 import CloseIcon from '../../assets/icons/ui-close.svg';
@@ -228,7 +229,7 @@ const ReportsPage = () => {
             </div>
             <div className={styles.topActions}>
               <div className={styles.notif}>
-                <img src={BellIcon} className={styles.notifIcon} />
+                <NotificationBell iconSrc={BellIcon} />
               </div>
               <div className={styles.avatar}>{initials}</div>
             </div>
@@ -254,7 +255,7 @@ const ReportsPage = () => {
           </div>
           <div className={styles.topActions}>
             <div className={styles.notif}>
-              <img src={BellIcon} className={styles.notifIcon} />
+              <NotificationBell iconSrc={BellIcon} />
             </div>
             <div className={styles.avatar}>{initials}</div>
           </div>

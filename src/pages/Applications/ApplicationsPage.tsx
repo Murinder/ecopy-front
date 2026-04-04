@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import styles from './ApplicationsPage.module.scss';
 import Sidebar from '../../components/Sidebar';
 import BellIcon from '../../assets/icons/mjbmqg4r-fcbhx7k.svg';
+import NotificationBell from '../../components/NotificationPanel';
 import CloseIcon from '../../assets/icons/ui-close.svg';
 import MailIcon from '../../assets/icons/ui-mail.svg';
 import PhoneIcon from '../../assets/icons/ui-phone.svg';
@@ -154,7 +155,7 @@ const ApplicationsPage = () => {
             </div>
             <div className={styles.topActions}>
               <div className={styles.notif}>
-                <img src={BellIcon} className={styles.notifIcon} />
+                <NotificationBell iconSrc={BellIcon} />
               </div>
               <div className={styles.avatar}>{initials}</div>
             </div>
@@ -179,7 +180,7 @@ const ApplicationsPage = () => {
           </div>
           <div className={styles.topActions}>
             <div className={styles.notif}>
-              <img src={BellIcon} className={styles.notifIcon} />
+              <NotificationBell iconSrc={BellIcon} />
             </div>
             <div className={styles.avatar}>{initials}</div>
           </div>

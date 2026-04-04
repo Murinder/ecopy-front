@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import styles from './ActivityPage.module.scss';
 import BellIcon from '../../assets/icons/mjbmqg4r-fcbhx7k.svg';
+import NotificationBell from '../../components/NotificationPanel';
 import PeopleIcon from '../../assets/icons/mjbmqg4r-g71l6vp.svg';
 import FileIcon from '../../assets/icons/ui-file.svg';
 import EyeIcon from '../../assets/icons/ui-eye.svg';
@@ -72,7 +73,7 @@ const TeacherActivityView = ({ avatarInitials }: { avatarInitials: string }) => 
             </div>
             <div className={styles.topActions}>
               <div className={styles.notif}>
-                <img src={BellIcon} style={{ width: 16, height: 16, position: 'absolute', top: 10, left: 10 }} />
+                <NotificationBell iconSrc={BellIcon} />
               </div>
               <div className={styles.avatarSmall}>{avatarInitials}</div>
             </div>
@@ -285,7 +286,7 @@ const StudentActivityView = ({ avatarInitials }: { avatarInitials: string }) => 
             </div>
             <div className={styles.topActions}>
               <div className={styles.notif}>
-                <img src={BellIcon} style={{ width: 16, height: 16, position: 'absolute', top: 10, left: 10 }} />
+                <NotificationBell iconSrc={BellIcon} />
               </div>
               <div className={styles.avatarSmall}>{avatarInitials}</div>
             </div>
@@ -459,7 +460,7 @@ const HeadAnalyticsView = ({ avatarInitials }: { avatarInitials: string }) => {
             </div>
             <div className={styles.topActions}>
               <div className={styles.notif}>
-                <img src={BellIcon} style={{ width: 16, height: 16, position: 'absolute', top: 10, left: 10 }} />
+                <NotificationBell iconSrc={BellIcon} />
               </div>
               <div className={styles.avatarSmall}>{avatarInitials}</div>
             </div>

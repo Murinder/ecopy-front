@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import styles from './RatingPage.module.scss';
 import Sidebar from '../../components/Sidebar';
 import BellIcon from '../../assets/icons/mjbmqg4r-fcbhx7k.svg';
+import NotificationBell from '../../components/NotificationPanel';
 import AwardIcon from '../../assets/icons/ui-award.svg';
 import BoltIcon from '../../assets/icons/ui-bolt.svg';
 import ChatIcon from '../../assets/icons/ui-chat.svg';
@@ -98,7 +99,7 @@ const RatingPage = () => {
           </div>
           <div className={styles.topActions}>
             <div className={styles.notif}>
-              <img src={BellIcon} className={styles.notifIcon} />
+              <NotificationBell iconSrc={BellIcon} />
             </div>
             <div className={styles.avatar}>{userName.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || 'ИИ'}</div>
           </div>
