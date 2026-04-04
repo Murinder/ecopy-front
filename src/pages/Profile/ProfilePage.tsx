@@ -33,6 +33,12 @@ import {
   useGetHeadProfileDetailsQuery,
 } from '../../services/coreApi';
 import { useGetRatingBreakdownQuery } from '../../services/ratingApi';
+import {
+  useGetUserDocumentsQuery,
+  useUploadUserDocumentMutation,
+  useDeleteUserDocumentMutation,
+} from '../../services/coreApi';
+import type { UserDocumentDto } from '../../services/coreApi';
 
 const initialsFromName = (name: string) =>
   name
@@ -137,10 +143,23 @@ const formatBirthDate = (dateStr: string): string => {
   return new Date(y, m - 1, d).toLocaleDateString('ru-RU');
 };
 
+const SKILL_LEVEL_LABELS: Record<number, string> = {
+  1: 'Начальный',
+  2: 'Базовый',
+  3: 'Средний',
+  4: 'Продвинутый',
+  5: 'Эксперт',
+};
+
 const StudentProfileView = ({ userName, userId }: { userName: string; userId: string }) => {
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [newSkillName, setNewSkillName] = useState('');
+  const [newSkillLevel, setNewSkillLevel] = useState(1);
+  const [showSkillForm, setShowSkillForm] = useState(false);
+  const [pendingSkillLevels, setPendingSkillLevels] = useState<Record<string, number>>({});
+  const [showDocuments, setShowDocuments] = useState(false);
   const { data: profileData, isLoading, isError, refetch: refetchProfile } = useGetProfileQuery(userId, { skip: !userId });
   const { data: linksData } = useGetUserLinksQuery(userId, { skip: !userId });
   const { data: skillsData } = useGetUserSkillsQuery(userId, { skip: !userId });
@@ -276,7 +295,7 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
       const addedSkills = draft.skills.filter(s => !profile.skills.includes(s));
       const removedSkills = profile.skills.filter(s => !draft.skills.includes(s));
       const skillOps = [
-        ...addedSkills.map(s => createUserSkill({ userId, skillName: s, level: 1, verified: false }).unwrap()),
+        ...addedSkills.map(s => createUserSkill({ userId, skillName: s, level: pendingSkillLevels[s] || 1, verified: false }).unwrap()),
         ...removedSkills.map(s => deleteUserSkill({ userId, skillName: s }).unwrap()),
       ];
 
@@ -298,13 +317,22 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
   };
 
   const addSkill = () => {
-    const name = window.prompt('Введите навык');
-    if (!name) return;
-    setDraft((p) => ({ ...p, skills: [...p.skills, name.trim()].filter(Boolean) }));
+    const trimmed = newSkillName.trim();
+    if (!trimmed || draft.skills.includes(trimmed)) return;
+    setDraft((p) => ({ ...p, skills: [...p.skills, trimmed] }));
+    setPendingSkillLevels((prev) => ({ ...prev, [trimmed]: newSkillLevel }));
+    setNewSkillName('');
+    setNewSkillLevel(1);
+    setShowSkillForm(false);
   };
 
   const removeSkill = (name: string) => {
     setDraft((p) => ({ ...p, skills: p.skills.filter(s => s !== name) }));
+    setPendingSkillLevels((prev) => {
+      const copy = { ...prev };
+      delete copy[name];
+      return copy;
+    });
   };
 
   const addLanguage = () => {
@@ -558,40 +586,44 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
                 </div>
               </div>
 
-              <div className={styles.cardTitle} style={{ marginTop: 14 }}>Быстрые действия</div>
-              <div className={styles.actionsList}>
-                <button className={styles.actionBtn} onClick={async () => {
-                  try {
-                    const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
-                    const authStr = localStorage.getItem('auth');
-                    const token = authStr ? JSON.parse(authStr)?.token?.accessToken : null;
-                    const res = await fetch(`${base}/api/v1/calendar/export.ics`, {
-                      headers: token ? { Authorization: `Bearer ${token}` } : {},
-                    });
-                    if (!res.ok) throw new Error('Ошибка загрузки');
-                    const blob = await res.blob();
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'schedule.ics';
-                    a.click();
-                    URL.revokeObjectURL(url);
-                  } catch {
-                    alert('Не удалось скачать расписание');
-                  }
-                }}>
-                  <img src={CalendarIcon} className={styles.actionIcon} />
-                  Скачать расписание (.ics)
-                </button>
-                <button className={styles.actionBtn} onClick={() => navigate('/events')}>
-                  <img src={CalendarIcon} className={styles.actionIcon} />
-                  Мероприятия
-                </button>
-                <button className={styles.actionBtn} onClick={() => navigate('/projects')}>
-                  <img src={FileIcon} className={styles.actionIcon} />
-                  Мои документы
-                </button>
-              </div>
+              {!isEditing && (
+                <>
+                  <div className={styles.cardTitle} style={{ marginTop: 14 }}>Быстрые действия</div>
+                  <div className={styles.actionsList}>
+                    <button className={styles.actionBtn} onClick={async () => {
+                      try {
+                        const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+                        const authStr = localStorage.getItem('auth');
+                        const token = authStr ? JSON.parse(authStr)?.token?.accessToken : null;
+                        const res = await fetch(`${base}/api/v1/calendar/export.ics`, {
+                          headers: token ? { Authorization: `Bearer ${token}` } : {},
+                        });
+                        if (!res.ok) throw new Error('Ошибка загрузки');
+                        const blob = await res.blob();
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'schedule.ics';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      } catch {
+                        alert('Не удалось скачать расписание');
+                      }
+                    }}>
+                      <img src={CalendarIcon} className={styles.actionIcon} />
+                      Скачать расписание (.ics)
+                    </button>
+                    <button className={styles.actionBtn} onClick={() => navigate('/events')}>
+                      <img src={CalendarIcon} className={styles.actionIcon} />
+                      Мероприятия
+                    </button>
+                    <button className={styles.actionBtn} onClick={() => setShowDocuments((v) => !v)}>
+                      <img src={FileIcon} className={styles.actionIcon} />
+                      Мои документы
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className={styles.card} style={{ gridColumn: '1 / -1' }}>
@@ -603,19 +635,45 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
                     {isEditing ? (
                       <>
                         {draft.skills.map((s) => (
-                          <span key={s} className={styles.chip}>
+                          <span key={s} className={styles.chip} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                             {s}
-                            <span onClick={() => removeSkill(s)} role="button" tabIndex={0} style={{ marginLeft: 6, cursor: 'pointer', opacity: 0.6 }}>×</span>
+                            {pendingSkillLevels[s] && (
+                              <span style={{ fontSize: 11, opacity: 0.6 }}>{SKILL_LEVEL_LABELS[pendingSkillLevels[s]]}</span>
+                            )}
+                            <span onClick={() => removeSkill(s)} role="button" tabIndex={0} style={{ marginLeft: 2, cursor: 'pointer', opacity: 0.6 }}>×</span>
                           </span>
                         ))}
-                        <span className={`${styles.chip} ${styles.addChip}`} onClick={addSkill} role="button" tabIndex={0}>+ Добавить</span>
+                        {showSkillForm ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <input
+                              value={newSkillName}
+                              onChange={(e) => setNewSkillName(e.target.value)}
+                              placeholder="Навык"
+                              style={{ width: 120, height: 28, borderRadius: 8, border: '1px solid #e5e5e5', padding: '0 8px', fontSize: 13 }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') addSkill(); }}
+                            />
+                            <select
+                              value={newSkillLevel}
+                              onChange={(e) => setNewSkillLevel(Number(e.target.value))}
+                              style={{ height: 28, borderRadius: 8, border: '1px solid #e5e5e5', padding: '0 4px', fontSize: 13 }}
+                            >
+                              {[1, 2, 3, 4, 5].map((lv) => (
+                                <option key={lv} value={lv}>{SKILL_LEVEL_LABELS[lv]}</option>
+                              ))}
+                            </select>
+                            <button onClick={addSkill} disabled={!newSkillName.trim()} style={{ height: 28, borderRadius: 8, border: 'none', background: '#3a76f0', color: '#fff', padding: '0 10px', fontSize: 13, cursor: 'pointer' }}>OK</button>
+                            <button onClick={() => { setShowSkillForm(false); setNewSkillName(''); setNewSkillLevel(1); }} style={{ height: 28, borderRadius: 8, border: '1px solid #e5e5e5', background: '#fff', padding: '0 10px', fontSize: 13, cursor: 'pointer' }}>×</button>
+                          </span>
+                        ) : (
+                          <span className={`${styles.chip} ${styles.addChip}`} onClick={() => setShowSkillForm(true)} role="button" tabIndex={0}>+ Добавить</span>
+                        )}
                       </>
                     ) : (
                       <>
                         {(skillsData ?? []).map((s) => (
                           <span key={s.skillName} className={styles.chip} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                             {s.skillName}
-                            <span style={{ fontSize: 11, opacity: 0.6 }}>Lv{s.level}</span>
+                            <span style={{ fontSize: 11, opacity: 0.6 }}>{SKILL_LEVEL_LABELS[s.level] || `Lv${s.level}`}</span>
                             {s.verified && <span style={{ color: '#16a34a', fontSize: 12 }} title="Подтверждено">✓</span>}
                           </span>
                         ))}
@@ -671,9 +729,123 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
                 </div>
               </div>
             </div>
+
+            {showDocuments && (
+              <DocumentsSection userId={userId} />
+            )}
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+const DocumentsSection = ({ userId }: { userId: string }) => {
+  const { data: docsResp } = useGetUserDocumentsQuery(userId);
+  const documents = docsResp?.data ?? [];
+  const [uploadUserDocument] = useUploadUserDocumentMutation();
+  const [deleteUserDocument] = useDeleteUserDocumentMutation();
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('userId', userId);
+      formData.append('description', file.name);
+      await uploadUserDocument(formData).unwrap();
+    } catch {
+      setUploadError('Ошибка при загрузке файла');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleDelete = async (docId: string) => {
+    try {
+      await deleteUserDocument(docId).unwrap();
+    } catch { /* handled */ }
+  };
+
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+
+  const handleDownload = async (doc: UserDocumentDto) => {
+    try {
+      const authStr = localStorage.getItem('auth');
+      const token = authStr ? JSON.parse(authStr)?.token?.accessToken : null;
+      const res = await fetch(`${baseUrl}/api/v1/user-documents/download/${doc.id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error('Ошибка загрузки');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = doc.fileName || 'document';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setUploadError('Не удалось скачать документ');
+    }
+  };
+
+  return (
+    <div className={styles.card} style={{ gridColumn: '1 / -1' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div className={styles.cardTitle}>Мои документы</div>
+        <label
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '6px 14px',
+            borderRadius: 8,
+            background: '#3a76f0',
+            color: '#fff',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: uploading ? 'not-allowed' : 'pointer',
+            opacity: uploading ? 0.6 : 1,
+          }}
+        >
+          <input type="file" onChange={handleUpload} style={{ display: 'none' }} disabled={uploading} />
+          {uploading ? 'Загрузка...' : '+ Загрузить'}
+        </label>
+      </div>
+      {uploadError && <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 8 }}>{uploadError}</p>}
+      {documents.length === 0 && (
+        <p style={{ color: '#94a3b8', fontSize: 14 }}>Нет загруженных документов</p>
+      )}
+      {documents.map((doc: UserDocumentDto) => (
+        <div key={doc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <img src={FileIcon} style={{ width: 16, height: 16, opacity: 0.5 }} />
+            <button
+              onClick={() => handleDownload(doc)}
+              style={{ color: '#3a76f0', fontSize: 14, textDecoration: 'none', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+            >
+              {doc.fileName || 'Документ'}
+            </button>
+            {doc.uploadedAt && (
+              <span style={{ fontSize: 12, color: '#9ca3af' }}>
+                {new Date(doc.uploadedAt).toLocaleDateString('ru-RU')}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => handleDelete(doc.id)}
+            style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 13 }}
+          >
+            Удалить
+          </button>
+        </div>
+      ))}
     </div>
   );
 };
@@ -1065,23 +1237,25 @@ const HeadProfileView = ({ userName, userId }: { userName: string; userId: strin
                 </div>
               </div>
 
-              <div className={styles.card}>
-                <div className={styles.cardTitle}>Быстрые действия</div>
-                <div className={styles.actionsList}>
-                  <button type="button" className={styles.actionBtn} onClick={() => navigate('/activity')}>
-                    <img src={AwardIcon} className={styles.actionIcon} />
-                    Аналитика кафедры
-                  </button>
-                  <button type="button" className={styles.actionBtn} onClick={() => navigate('/teachers')}>
-                    <img src={PeopleIcon} className={styles.actionIcon} />
-                    Управление кафедрой
-                  </button>
-                  <button type="button" className={styles.actionBtn} onClick={() => navigate('/reports')}>
-                    <img src={FileIcon} className={styles.actionIcon} />
-                    Отчеты кафедры
-                  </button>
+              {!isEditing && (
+                <div className={styles.card}>
+                  <div className={styles.cardTitle}>Быстрые действия</div>
+                  <div className={styles.actionsList}>
+                    <button type="button" className={styles.actionBtn} onClick={() => navigate('/activity')}>
+                      <img src={AwardIcon} className={styles.actionIcon} />
+                      Аналитика кафедры
+                    </button>
+                    <button type="button" className={styles.actionBtn} onClick={() => navigate('/teachers')}>
+                      <img src={PeopleIcon} className={styles.actionIcon} />
+                      Управление кафедрой
+                    </button>
+                    <button type="button" className={styles.actionBtn} onClick={() => navigate('/reports')}>
+                      <img src={FileIcon} className={styles.actionIcon} />
+                      Отчеты кафедры
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -1447,23 +1621,25 @@ const TeacherProfileView = ({ userName, userId }: { userName: string; userId: st
                 </div>
               </div>
 
-              <div className={styles.card}>
-                <div className={styles.cardTitle}>Быстрые действия</div>
-                <div className={styles.actionsList}>
-                  <button type="button" className={styles.actionBtn} onClick={() => navigate('/schedule')}>
-                    <img src={CalendarIcon} className={styles.actionIcon} />
-                    Мое расписание
-                  </button>
-                  <button type="button" className={styles.actionBtn} onClick={() => navigate('/applications')}>
-                    <img src={PeopleIcon} className={styles.actionIcon} />
-                    Заявки студентов
-                  </button>
-                  <button type="button" className={styles.actionBtn} onClick={() => navigate('/reports')}>
-                    <img src={FileIcon} className={styles.actionIcon} />
-                    Мои отчеты
-                  </button>
+              {!isEditing && (
+                <div className={styles.card}>
+                  <div className={styles.cardTitle}>Быстрые действия</div>
+                  <div className={styles.actionsList}>
+                    <button type="button" className={styles.actionBtn} onClick={() => navigate('/schedule')}>
+                      <img src={CalendarIcon} className={styles.actionIcon} />
+                      Мое расписание
+                    </button>
+                    <button type="button" className={styles.actionBtn} onClick={() => navigate('/applications')}>
+                      <img src={PeopleIcon} className={styles.actionIcon} />
+                      Заявки студентов
+                    </button>
+                    <button type="button" className={styles.actionBtn} onClick={() => navigate('/reports')}>
+                      <img src={FileIcon} className={styles.actionIcon} />
+                      Мои отчеты
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

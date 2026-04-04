@@ -27,6 +27,8 @@ export interface RegisterRequest {
   firstName: string;
   lastName: string;
   phoneNumber?: string;
+  role?: 'STUDENT' | 'LECTURER';
+  groupName?: string;
 }
 
 export interface UserProfileDto {
@@ -148,6 +150,15 @@ export interface UserLanguageDto {
   userId: string;
   language: string;
   proficiency: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'FLUENT' | 'NATIVE';
+}
+
+export interface UserDocumentDto {
+  id: string;
+  userId: string;
+  filePath: string;
+  fileName: string;
+  description?: string;
+  uploadedAt?: string;
 }
 
 export interface TeacherDetailedDto {
@@ -294,7 +305,7 @@ export const coreApi = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Applications', 'Profile', 'Teachers', 'Students', 'UserLinks', 'UserSkills', 'UserLanguages', 'Notifications'],
+  tagTypes: ['Applications', 'Profile', 'Teachers', 'Students', 'UserLinks', 'UserSkills', 'UserLanguages', 'Notifications', 'UserDocuments'],
   endpoints: (builder) => ({
     login: builder.mutation<ApiResponse<TokenDto>, LoginRequest>({
       query: (body) => ({
@@ -469,6 +480,25 @@ export const coreApi = createApi({
       }),
       invalidatesTags: ['UserLanguages'],
     }),
+    getUserDocuments: builder.query<ApiResponse<UserDocumentDto[]>, string>({
+      query: (userId) => `/api/v1/user-documents/user/${userId}`,
+      providesTags: ['UserDocuments'],
+    }),
+    uploadUserDocument: builder.mutation<ApiResponse<UserDocumentDto>, FormData>({
+      query: (formData) => ({
+        url: '/api/v1/user-documents/upload',
+        method: 'POST',
+        body: formData,
+      }),
+      invalidatesTags: ['UserDocuments'],
+    }),
+    deleteUserDocument: builder.mutation<ApiResponse<void>, string>({
+      query: (id) => ({
+        url: `/api/v1/user-documents/${id}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['UserDocuments'],
+    }),
   }),
 });
 
@@ -503,4 +533,7 @@ export const {
   useMarkNotificationReadMutation,
   useGetFacultyQuery,
   useGetDepartmentQuery,
+  useGetUserDocumentsQuery,
+  useUploadUserDocumentMutation,
+  useDeleteUserDocumentMutation,
 } = coreApi;

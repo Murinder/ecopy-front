@@ -11,7 +11,8 @@ import CalendarIcon from '../assets/icons/mjbmqg4r-fgt12s1.svg';
 import ScheduleIcon from '../assets/icons/mjbmnzii-lc4urbp.svg';
 import FileIcon from '../assets/icons/ui-file.svg';
 import PeopleIcon from '../assets/icons/mjbmqg4r-g71l6vp.svg';
-import { useAppSelector } from '../app/hooks';
+import { useAppDispatch, useAppSelector } from '../app/hooks';
+import { logout } from '../features/auth/authSlice';
 
 type NavItem = {
   key: string;
@@ -76,6 +77,7 @@ const navForRole = (role: string): { portalSubtitle: string; items: NavItem[] } 
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const dispatch = useAppDispatch();
   const userName = useAppSelector((s) => s.auth.userName) || 'Иван Иванов';
   const userRole = useAppSelector((s) => s.auth.userRole) || 'Студент';
 
@@ -152,16 +154,47 @@ const Sidebar = () => {
         })}
       </div>
 
-      <div className={sidebarStyles.container4} style={{ marginTop: 'auto' }}>
-        <div className={sidebarStyles.primitiveSpan}>
-          <div className={sidebarStyles.text8}>
-            <p className={sidebarStyles.a6}>{initials}</p>
+      <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className={sidebarStyles.container4}>
+          <div className={sidebarStyles.primitiveSpan}>
+            <div className={sidebarStyles.text8}>
+              <p className={sidebarStyles.a6}>{initials}</p>
+            </div>
+          </div>
+          <div className={sidebarStyles.container3}>
+            <p className={sidebarStyles.a7}>{userName}</p>
+            <p className={sidebarStyles.a8}>{userRole}</p>
           </div>
         </div>
-        <div className={sidebarStyles.container3}>
-          <p className={sidebarStyles.a7}>{userName}</p>
-          <p className={sidebarStyles.a8}>{userRole}</p>
-        </div>
+        <button
+          onClick={() => {
+            dispatch(logout());
+            navigate('/auth');
+          }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            background: 'transparent',
+            border: 'none',
+            color: '#9ca3af',
+            fontSize: 14,
+            fontWeight: 500,
+            cursor: 'pointer',
+            padding: '8px 16px',
+            borderRadius: 8,
+            transition: 'color 0.15s',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = '#9ca3af')}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          Выход
+        </button>
       </div>
     </div>
   );

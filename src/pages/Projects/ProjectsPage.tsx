@@ -194,6 +194,7 @@ const ProjectsPage = () => {
   );
   const tasksServer = tasksResp?.data || [];
   const [fallbackTasks, setFallbackTasks] = useState<TaskDto[]>([]);
+  const [taskError, setTaskError] = useState<string | null>(null);
   const tasks = tasksServer.length
     ? tasksServer
     : fallbackTasks.filter((t) => t.projectId === selectedProjectId);
@@ -326,6 +327,7 @@ const ProjectsPage = () => {
 
   const onAddTask = async (status: TaskDto['status']) => {
     if (!selectedProjectId) return;
+    setTaskError(null);
     const body: Partial<TaskDto> = {
       projectId: selectedProjectId,
       title: 'Новая задача',
@@ -334,7 +336,9 @@ const ProjectsPage = () => {
     };
     try {
       await createTask(body).unwrap();
-    } catch {
+    } catch (err: unknown) {
+      const apiErr = err as { data?: { message?: string } };
+      setTaskError(apiErr?.data?.message || 'Не удалось создать задачу. Проверьте подключение к серверу.');
       const localTask: TaskDto = {
         id: `local-${Date.now()}`,
         projectId: selectedProjectId,
@@ -706,18 +710,19 @@ const ProjectsPage = () => {
                         <p className={styles.a14}>Архив</p>
                       </button>
                     </div>
-                    {(isTeacher || isHead) && (
-                      <div className={styles.button9} onClick={openCreateProject}>
-                        <img src={AddIcon} className={styles.icon4} />
-                        <p className={styles.a15}>Создать проект</p>
-                      </div>
-                    )}
+                    <div className={styles.button9} onClick={openCreateProject}>
+                      <img src={AddIcon} className={styles.icon4} />
+                      <p className={styles.a15}>Создать проект</p>
+                    </div>
                   </div>
 
                   <div className={styles.container29}>
                     {projectsLoading && <div style={{ padding: 12 }}>Загрузка проектов...</div>}
                     {projects.length === 0 && !projectsLoading && studentTab === 'all' && (
-                      <DemoProjects onSelect={(id) => setSelectedProjectId(id)} />
+                      <div style={{ padding: '32px 16px', textAlign: 'center' }}>
+                        <p style={{ fontSize: 16, fontWeight: 600, color: '#0e1d45', marginBottom: 8 }}>У вас пока нет проектов</p>
+                        <p style={{ fontSize: 14, color: '#6b7280' }}>Создайте свой первый проект, чтобы начать работу</p>
+                      </div>
                     )}
                     {!projectsLoading && filteredStudentProjects.length === 0 && studentTab !== 'all' && (
                       <p className={styles.empty}>Нет проектов в этой категории</p>
@@ -798,6 +803,12 @@ const ProjectsPage = () => {
                           Организация задач в колонках статусов
                         </p>
                       </div>
+                      {taskError && (
+                        <div style={{ padding: '8px 16px', marginBottom: 8, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, color: '#dc2626', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span>{taskError}</span>
+                          <button onClick={() => setTaskError(null)} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 16 }}>×</button>
+                        </div>
+                      )}
                       <div className={styles.projectsPage10}>
                         <KanbanColumn
                           title="К выполнению"
@@ -1500,30 +1511,5 @@ const KanbanColumn = ({
   );
 };
 
-const DemoProjects = ({ onSelect }: { onSelect: (id: string) => void }) => {
-  const demo: ProjectDto[] = [
-    {
-      id: 'demo-1',
-      title: 'Разработка мобильного приложения',
-      description: 'Создание образовательного приложения для iOS и Android',
-      status: 'ACTIVE',
-      endDate: '15.12.2025',
-    },
-    {
-      id: 'demo-2',
-      title: 'Исследование AI в образовании',
-      description: 'Анализ применения искусственного интеллекта в учебном процессе',
-      status: 'ACTIVE',
-      endDate: '30.11.2025',
-    },
-  ];
-  return (
-    <>
-      {demo.map((p) => (
-        <ProjectCard key={p.id} project={p} onSelect={() => onSelect(p.id)} />
-      ))}
-    </>
-  );
-};
 
 export default ProjectsPage;

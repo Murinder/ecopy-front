@@ -650,12 +650,16 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
   const [applyModalEventId, setApplyModalEventId] = useState<string | null>(null);
   const [applyMotivation, setApplyMotivation] = useState('');
   const [applySkills, setApplySkills] = useState('');
+  const [applyExperience, setApplyExperience] = useState('');
+  const [applyTelegram, setApplyTelegram] = useState('');
+  const [applyTeamRole, setApplyTeamRole] = useState('');
   const [applyError, setApplyError] = useState<string | null>(null);
   const [teamModalEventId, setTeamModalEventId] = useState<string | null>(null);
   const [createTeamName, setCreateTeamName] = useState('');
   const [createTeamOpen, setCreateTeamOpen] = useState(false);
   const [createTeam] = useCreateTeamMutation();
   const [joinTeam] = useJoinTeamMutation();
+  const [userJoinedTeamId, setUserJoinedTeamId] = useState<string | null>(null);
 
   const myApplications = useMemo(() => myApplicationsData ?? [], [myApplicationsData]);
   const myApplicationByEventId = useMemo(() => {
@@ -667,6 +671,11 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
   const teamsEventId = teamModalEventId ?? selectedId ?? '';
   const { data: eventTeamsData } = useGetEventTeamsQuery(teamsEventId, { skip: !teamsEventId });
   const eventTeams = useMemo(() => eventTeamsData ?? [], [eventTeamsData]);
+
+  const isInTeam = useMemo(() => {
+    if (userJoinedTeamId) return true;
+    return eventTeams.some((t) => t.createdBy === userId);
+  }, [eventTeams, userId, userJoinedTeamId]);
 
   const upcoming = useMemo<EventItem[]>(() => {
     if (apiEvents?.success && apiEvents.data.length > 0) {
@@ -734,6 +743,9 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
     setApplyModalEventId(eventId);
     setApplyMotivation('');
     setApplySkills('');
+    setApplyExperience('');
+    setApplyTelegram('');
+    setApplyTeamRole('');
     setApplyError(null);
   };
 
@@ -743,7 +755,12 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
     if (!applyModalEventId || !userId) return;
     setApplyError(null);
     try {
-      await applyToEvent({ eventId: applyModalEventId, userId, motivation: applyMotivation, skills: applySkills }).unwrap();
+      const motivationParts = [applyMotivation];
+      if (applyExperience.trim()) motivationParts.push(`Опыт: ${applyExperience.trim()}`);
+      if (applyTelegram.trim()) motivationParts.push(`Telegram: ${applyTelegram.trim()}`);
+      if (applyTeamRole) motivationParts.push(`Роль: ${applyTeamRole}`);
+      const fullMotivation = motivationParts.join('\n\n');
+      await applyToEvent({ eventId: applyModalEventId, userId, motivation: fullMotivation, skills: applySkills }).unwrap();
       closeApplyModal();
     } catch {
       setApplyError('Ошибка при подаче заявки');
@@ -755,13 +772,19 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
   };
 
   const handleJoinTeam = async (teamId: string) => {
-    if (!userId) return;
-    await joinTeam({ teamId, userId, role: 'member' }).catch(() => {});
+    if (!userId || isInTeam) return;
+    try {
+      await joinTeam({ teamId, userId, role: 'member' }).unwrap();
+      setUserJoinedTeamId(teamId);
+    } catch { /* handled by RTK */ }
   };
 
   const handleCreateTeam = async () => {
-    if (!teamModalEventId || !createTeamName.trim()) return;
-    await createTeam({ eventId: teamModalEventId, name: createTeamName.trim() }).unwrap().catch(() => {});
+    if (!teamModalEventId || !createTeamName.trim() || isInTeam) return;
+    try {
+      const created = await createTeam({ eventId: teamModalEventId, name: createTeamName.trim() }).unwrap();
+      setUserJoinedTeamId(created.id);
+    } catch { /* handled by RTK */ }
     setCreateTeamName('');
     setCreateTeamOpen(false);
   };
@@ -1071,11 +1094,19 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
             {selected.tag === 'Хакатон' && (
               <>
                 <div className={styles.sectionLabel}>Команды</div>
+                {isInTeam && (
+                  <p style={{ color: '#16a34a', fontSize: 13, marginBottom: 8 }}>Вы уже состоите в команде</p>
+                )}
                 <div style={{ marginBottom: 8 }}>
                   {eventTeams.map((team) => (
                     <div key={team.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f0f0f0' }}>
-                      <span>{team.name}</span>
-                      {team.createdBy !== userId && (
+                      <span>
+                        {team.name}
+                        {(team.createdBy === userId || userJoinedTeamId === team.id) && (
+                          <span style={{ marginLeft: 8, fontSize: 11, color: '#3a76f0' }}>(ваша)</span>
+                        )}
+                      </span>
+                      {team.createdBy !== userId && !isInTeam && (
                         <button className={`${styles.actionBtn} ${styles.mutedBtn}`} style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => handleJoinTeam(team.id)}>
                           Вступить
                         </button>
@@ -1084,29 +1115,33 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                   ))}
                   {eventTeams.length === 0 && <p style={{ color: '#888', fontSize: 13 }}>Команд пока нет</p>}
                 </div>
-                {!createTeamOpen ? (
-                  <button
-                    className={`${styles.actionBtn} ${styles.mutedBtn}`}
-                    style={{ marginBottom: 12 }}
-                    onClick={() => { setTeamModalEventId(selected.id); setCreateTeamOpen(true); }}
-                  >
-                    + Создать команду
-                  </button>
-                ) : (
-                  <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                    <input
-                      className={styles.teacherInput}
-                      placeholder="Название команды"
-                      value={createTeamName}
-                      onChange={(e) => setCreateTeamName(e.target.value)}
-                    />
-                    <button className={`${styles.actionBtn} ${styles.mutedBtn}`} onClick={handleCreateTeam} disabled={!createTeamName.trim()}>
-                      Создать
-                    </button>
-                    <button className={`${styles.actionBtn} ${styles.dangerBtn}`} onClick={() => setCreateTeamOpen(false)}>
-                      Отмена
-                    </button>
-                  </div>
+                {!isInTeam && (
+                  <>
+                    {!createTeamOpen ? (
+                      <button
+                        className={`${styles.actionBtn} ${styles.mutedBtn}`}
+                        style={{ marginBottom: 12 }}
+                        onClick={() => { setTeamModalEventId(selected.id); setCreateTeamOpen(true); }}
+                      >
+                        + Создать команду
+                      </button>
+                    ) : (
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                        <input
+                          className={styles.teacherInput}
+                          placeholder="Название команды"
+                          value={createTeamName}
+                          onChange={(e) => setCreateTeamName(e.target.value)}
+                        />
+                        <button className={`${styles.actionBtn} ${styles.mutedBtn}`} onClick={handleCreateTeam} disabled={!createTeamName.trim()}>
+                          Создать
+                        </button>
+                        <button className={`${styles.actionBtn} ${styles.dangerBtn}`} onClick={() => setCreateTeamOpen(false)}>
+                          Отмена
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             )}
@@ -1175,6 +1210,40 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                 value={applySkills}
                 onChange={(e) => setApplySkills(e.target.value)}
               />
+            </div>
+            <div className={styles.teacherField} style={{ marginTop: 12 }}>
+              <div className={styles.teacherLabel}>Опыт участия</div>
+              <textarea
+                className={styles.teacherTextarea}
+                placeholder="Расскажите о вашем опыте в похожих мероприятиях"
+                value={applyExperience}
+                onChange={(e) => setApplyExperience(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div className={styles.teacherField} style={{ marginTop: 12 }}>
+              <div className={styles.teacherLabel}>Контактный Telegram</div>
+              <input
+                className={styles.teacherInput}
+                placeholder="@username"
+                value={applyTelegram}
+                onChange={(e) => setApplyTelegram(e.target.value)}
+              />
+            </div>
+            <div className={styles.teacherField} style={{ marginTop: 12 }}>
+              <div className={styles.teacherLabel}>Желаемая роль в команде</div>
+              <select
+                className={styles.teacherSelect}
+                value={applyTeamRole}
+                onChange={(e) => setApplyTeamRole(e.target.value)}
+              >
+                <option value="">Не выбрано</option>
+                <option value="Разработчик">Разработчик</option>
+                <option value="Дизайнер">Дизайнер</option>
+                <option value="Аналитик">Аналитик</option>
+                <option value="Менеджер">Менеджер</option>
+                <option value="Другое">Другое</option>
+              </select>
             </div>
             {applyError && <p style={{ color: '#e53935', fontSize: 13, marginTop: 8 }}>{applyError}</p>}
             <div className={styles.teacherCreateActions} style={{ marginTop: 20 }}>

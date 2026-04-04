@@ -33,6 +33,9 @@ const AuthPage = () => {
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [regRole, setRegRole] = useState<'STUDENT' | 'LECTURER'>('STUDENT');
+  const [groupName, setGroupName] = useState('');
   const [remember, setRemember] = useState(false);
   const [errorText, setErrorText] = useState<string | undefined>();
 
@@ -117,7 +120,7 @@ const AuthPage = () => {
         dispatch(setRememberMe(remember));
         navigate('/projects');
       } else {
-        const regRes = await register({ email, password, firstName, lastName }).unwrap();
+        const regRes = await register({ email, password, firstName, lastName, phoneNumber: phoneNumber || undefined, role: regRole, groupName: regRole === 'STUDENT' && groupName ? groupName : undefined }).unwrap();
         dispatch(setUserId(regRes.data.id));
         dispatch(setUserName(`${firstName} ${lastName}`.trim() || email));
         dispatch(setUserRole(backendRoleToUiRole[regRes.data.role || ''] || 'Студент'));
@@ -131,8 +134,17 @@ const AuthPage = () => {
         }
       }
     } catch (err: unknown) {
-      const msg = (err as { data?: { message?: string } })?.data?.message;
-      setErrorText(msg || 'Ошибка при подключении к серверу. Проверьте доступность API.');
+      const apiErr = err as { status?: number; data?: { message?: string } };
+      const msg = apiErr?.data?.message;
+      if (msg) {
+        setErrorText(msg);
+      } else if (tab === 'login') {
+        setErrorText(apiErr?.status === 401 || apiErr?.status === 403
+          ? 'Неверный email или пароль'
+          : 'Ошибка при подключении к серверу. Проверьте доступность API.');
+      } else {
+        setErrorText('Ошибка при регистрации. Попробуйте позже.');
+      }
     }
   };
 
@@ -153,12 +165,15 @@ const AuthPage = () => {
         <div className={styles.primitiveDiv}>
           <div className={styles.tabList}>
             <button
-              className={styles.primitiveButton}
+              className={tab === 'login' ? styles.tabActive : styles.tabInactive}
               onClick={() => setTab('login')}
             >
-              <p className={styles.a3}>Вход</p>
+              Вход
             </button>
-            <button className={styles.a4} onClick={() => setTab('register')}>
+            <button
+              className={tab === 'register' ? styles.tabActive : styles.tabInactive}
+              onClick={() => setTab('register')}
+            >
               Регистрация
             </button>
           </div>
@@ -275,6 +290,44 @@ const AuthPage = () => {
                     />
                   </div>
                 </div>
+                <div className={styles.app3}>
+                  <p className={styles.email}>Телефон</p>
+                  <div className={styles.input}>
+                    <input
+                      className={styles.studentUniversityEdu}
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      placeholder="+7 (999) 123-45-67"
+                    />
+                  </div>
+                </div>
+                <div className={styles.app3}>
+                  <p className={styles.email}>Роль</p>
+                  <div className={styles.input}>
+                    <select
+                      className={styles.studentUniversityEdu}
+                      value={regRole}
+                      onChange={(e) => setRegRole(e.target.value as 'STUDENT' | 'LECTURER')}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <option value="STUDENT">Студент</option>
+                      <option value="LECTURER">Преподаватель</option>
+                    </select>
+                  </div>
+                </div>
+                {regRole === 'STUDENT' && (
+                  <div className={styles.app3}>
+                    <p className={styles.email}>Группа</p>
+                    <div className={styles.input}>
+                      <input
+                        className={styles.studentUniversityEdu}
+                        value={groupName}
+                        onChange={(e) => setGroupName(e.target.value)}
+                        placeholder="ПИ-21-1"
+                      />
+                    </div>
+                  </div>
+                )}
               </>
             )}
             <button type="button" className={styles.button} onClick={onSubmit}>
@@ -292,7 +345,7 @@ const AuthPage = () => {
               <p className={styles.aSso}>Войти через SSO</p>
             </button>
             {errorText && (
-              <div style={{ marginTop: 16, color: '#d00' }}>{errorText}</div>
+              <div className={styles.errorMessage}>{errorText}</div>
             )}
 
             {forgotOpen && (
