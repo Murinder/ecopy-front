@@ -48,6 +48,16 @@ export interface DocumentDto {
   description?: string;
 }
 
+export interface ProjectCommentDto {
+  id: string;
+  projectId: string;
+  authorId: string;
+  authorName: string;
+  authorRole: string;
+  content: string;
+  createdAt: string;
+}
+
 export interface MemberTaskSummary {
   userId: string;
   firstName?: string;
@@ -92,7 +102,7 @@ export const projectApi = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Projects', 'Tasks', 'Documents'],
+  tagTypes: ['Projects', 'Tasks', 'Documents', 'Comments'],
   endpoints: (builder) => ({
     getUserProjects: builder.query<ApiResponse<ProjectDto[]>, string>({
       query: (userId) => ({
@@ -190,6 +200,21 @@ export const projectApi = createApi({
       }),
       invalidatesTags: ['Documents'],
     }),
+    getProjectComments: builder.query<ApiResponse<ProjectCommentDto[]>, string>({
+      query: (projectId) => `/api/v1/projects/${projectId}/comments`,
+      providesTags: ['Comments'],
+    }),
+    addProjectComment: builder.mutation<
+      ApiResponse<ProjectCommentDto>,
+      { projectId: string; authorId: string; authorRole: string; content: string }
+    >({
+      query: ({ projectId, ...body }) => ({
+        url: `/api/v1/projects/${projectId}/comments`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Comments'],
+    }),
   }),
 });
 
@@ -208,4 +233,6 @@ export const {
   useGetProjectDocumentsQuery,
   useUploadDocumentMutation,
   useDeleteDocumentMutation,
+  useGetProjectCommentsQuery,
+  useAddProjectCommentMutation,
 } = projectApi;

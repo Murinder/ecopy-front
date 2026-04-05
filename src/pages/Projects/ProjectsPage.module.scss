@@ -2444,3 +2444,295 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ═══ Teacher Full-View Modal ═══ */
+.teacherFullViewModal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  background: #ffffff;
+  padding: 32px;
+  width: 100%;
+  max-width: 1200px;
+  max-height: 92vh;
+  overflow-y: auto;
+}
+
+.fullViewHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.fullViewTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0e1d45;
+  margin: 0;
+}
+
+.fullViewPills {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.fullViewClose {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  &:hover {
+    background: #f1f5f9;
+  }
+  img {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.fullViewSection {
+  margin-bottom: 24px;
+}
+
+.fullViewSectionTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0e1d45;
+  margin-bottom: 12px;
+}
+
+/* Read-only Kanban */
+.readOnlyKanban {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.readOnlyColumn {
+  flex: 0 0 220px;
+  min-width: 220px;
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.readOnlyColumnHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.readOnlyColumnTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.readOnlyColumnCount {
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  background: #e2e8f0;
+  border-radius: 10px;
+  padding: 2px 8px;
+}
+
+.readOnlyTaskCard {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.readOnlyTaskTitle {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1e293b;
+  margin-bottom: 6px;
+}
+
+.readOnlyTaskMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.readOnlyTaskStatus {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+/* Documents with download */
+.docRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  margin-bottom: 6px;
+}
+
+.docInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.docIcon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.docName {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.docDate {
+  font-size: 11px;
+  color: #94a3b8;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.docDownloadBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  color: #3b82f6;
+  flex-shrink: 0;
+  &:hover {
+    background: #eff6ff;
+  }
+  img {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+/* Comments */
+.commentsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.commentItem {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.commentHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.commentAuthor {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0e1d45;
+}
+
+.commentRole {
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  background: #e2e8f0;
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-left: 6px;
+}
+
+.commentRoleLecturer {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.commentTime {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.commentText {
+  font-size: 13px;
+  color: #334155;
+  line-height: 1.5;
+}
+
+.commentInput {
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 12px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: 'Inter', sans-serif;
+  resize: vertical;
+  box-sizing: border-box;
+  outline: none;
+  &:focus {
+    border-color: #3b82f6;
+  }
+}
+
+.commentSendBtn {
+  margin-top: 8px;
+  padding: 8px 20px;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  &:hover {
+    background: #2563eb;
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.commentEmpty {
+  font-size: 13px;
+  color: #94a3b8;
+  padding: 8px 0;
+}

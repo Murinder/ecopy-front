@@ -18,7 +18,7 @@ import {
 } from '../../services/coreApi';
 import type { ApplicationViewDto, ApplicationStatusType } from '../../services/coreApi';
 
-type TabKey = 'active' | 'completed' | 'all';
+type TabKey = 'active' | 'in_progress' | 'completed' | 'all';
 
 const KIND_LABELS: Record<string, string> = {
   PROJECT: 'Проект', CONSULT: 'Консультация', VKR: 'ВКР',
@@ -87,14 +87,26 @@ const ApplicationsPage = () => {
     : (adminApps?.data ?? []);
 
   const items = rawApps;
-  const activeCount = items.filter(r => ACTIVE_STATUSES.includes(r.status)).length;
-  const completedCount = items.length - activeCount;
+
+  // Head gets separate counts for ADMIN_REVIEW vs IN_PROGRESS
+  const newCount = isHead
+    ? items.filter(r => r.status === 'ADMIN_REVIEW').length
+    : items.filter(r => ACTIVE_STATUSES.includes(r.status)).length;
+  const inProgressCount = items.filter(r => r.status === 'IN_PROGRESS').length;
+  const completedCount = isHead
+    ? items.filter(r => r.status !== 'ADMIN_REVIEW' && r.status !== 'IN_PROGRESS').length
+    : items.length - newCount;
 
   const list = useMemo(() => {
     if (tab === 'all') return items;
+    if (isHead) {
+      if (tab === 'active') return items.filter(r => r.status === 'ADMIN_REVIEW');
+      if (tab === 'in_progress') return items.filter(r => r.status === 'IN_PROGRESS');
+      return items.filter(r => r.status !== 'ADMIN_REVIEW' && r.status !== 'IN_PROGRESS');
+    }
     if (tab === 'active') return items.filter(r => ACTIVE_STATUSES.includes(r.status));
     return items.filter(r => !ACTIVE_STATUSES.includes(r.status));
-  }, [items, tab]);
+  }, [items, tab, isHead]);
 
   const closeModal = () => {
     setSelectedApp(null);
@@ -186,13 +198,24 @@ const ApplicationsPage = () => {
           <div className={styles.stats}>
             <div className={styles.statCard}>
               <div>
-                <div className={styles.statLabel}>Активные</div>
-                <div className={styles.statValue}>{activeCount}</div>
+                <div className={styles.statLabel}>{isHead ? 'Новые' : 'Активные'}</div>
+                <div className={styles.statValue}>{newCount}</div>
               </div>
               <div className={`${styles.statIconWrap} ${styles.statIconWrapYellow}`}>
                 <img src={BoltIcon} className={styles.statIcon} />
               </div>
             </div>
+            {isHead && (
+              <div className={styles.statCard}>
+                <div>
+                  <div className={styles.statLabel}>В исполнении</div>
+                  <div className={styles.statValue}>{inProgressCount}</div>
+                </div>
+                <div className={`${styles.statIconWrap} ${styles.statIconWrapBlue}`}>
+                  <img src={BoltIcon} className={styles.statIcon} />
+                </div>
+              </div>
+            )}
             <div className={styles.statCard}>
               <div>
                 <div className={styles.statLabel}>Завершённые</div>
@@ -215,8 +238,13 @@ const ApplicationsPage = () => {
 
           <div className={styles.tabs}>
             <button type="button" className={tab === 'active' ? styles.tabActive : styles.tab} onClick={() => setTab('active')}>
-              Активные ({activeCount})
+              {isHead ? 'Новые' : 'Активные'} ({newCount})
             </button>
+            {isHead && (
+              <button type="button" className={tab === 'in_progress' ? styles.tabActive : styles.tab} onClick={() => setTab('in_progress')}>
+                В исполнении ({inProgressCount})
+              </button>
+            )}
             <button type="button" className={tab === 'completed' ? styles.tabActive : styles.tab} onClick={() => setTab('completed')}>
               Завершённые ({completedCount})
             </button>

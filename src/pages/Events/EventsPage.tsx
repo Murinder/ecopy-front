@@ -125,7 +125,7 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
   const [teacherCreateDate, setTeacherCreateDate] = useState('');
   const [teacherCreateTime, setTeacherCreateTime] = useState('');
   const [teacherCreateDuration, setTeacherCreateDuration] = useState('60');
-  const [teacherCreatePlace, setTeacherCreatePlace] = useState('Кабинет 401');
+  const [teacherCreatePlace, setTeacherCreatePlace] = useState('');
   const [teacherCreateParticipants, setTeacherCreateParticipants] = useState('');
   const [teacherCreateOnline, setTeacherCreateOnline] = useState(false);
   const [teacherCreateError, setTeacherCreateError] = useState('');
@@ -245,7 +245,7 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
     setTeacherCreateDate(`${y}-${String(m + 1).padStart(2, '0')}-01`);
     setTeacherCreateTime('');
     setTeacherCreateDuration('60');
-    setTeacherCreatePlace('Кабинет 401');
+    setTeacherCreatePlace('');
     setTeacherCreateParticipants('');
     setTeacherCreateOnline(false);
   };
@@ -615,7 +615,7 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
               </div>
 
               <label className={styles.teacherCheckboxRow}>
-                <input type="checkbox" checked={teacherCreateOnline} onChange={(e) => setTeacherCreateOnline(e.target.checked)} />
+                <input type="checkbox" checked={teacherCreateOnline} onChange={(e) => { setTeacherCreateOnline(e.target.checked); setTeacherCreatePlace(''); }} />
                 Онлайн мероприятие
               </label>
             </div>
@@ -1132,51 +1132,6 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                       ))}
                     </div>
 
-                    {selected.tag === 'Хакатон' && myTeam && (
-                      <>
-                        <div className={styles.sectionLabel}>Ваша команда</div>
-                        <div style={{ padding: '8px 12px', background: '#f0f4ff', borderRadius: 8, marginBottom: 8 }}>
-                          <div style={{ fontWeight: 600, fontSize: 14 }}>
-                            {myTeam.name}
-                            {isTeamLeader && <span style={{ marginLeft: 8, fontSize: 11, color: '#3B82F6' }}>(вы лидер)</span>}
-                          </div>
-                          {myTeam.memberUserIds && myTeam.memberUserIds.length > 0 && (
-                            <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
-                              Участников: {myTeam.memberUserIds.length}
-                            </div>
-                          )}
-                        </div>
-                        {isTeamLeader && pendingJoinRequests.length > 0 && (
-                          <div style={{ marginBottom: 8 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: '#1B2559', marginBottom: 6 }}>
-                              Заявки на вступление ({pendingJoinRequests.length})
-                            </div>
-                            {pendingJoinRequests.map((req) => (
-                              <div key={req.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #E2E8F0' }}>
-                                <span style={{ fontSize: 13 }}>{req.userName || req.userId.slice(0, 8) + '...'}</span>
-                                <div style={{ display: 'flex', gap: 6 }}>
-                                  <button
-                                    className={`${styles.actionBtn} ${styles.primaryBtn}`}
-                                    style={{ padding: '3px 10px', fontSize: 12, height: 'auto' }}
-                                    onClick={() => teamDecision({ id: req.id, status: 'APPROVED' })}
-                                  >
-                                    Принять
-                                  </button>
-                                  <button
-                                    className={`${styles.actionBtn} ${styles.dangerBtn}`}
-                                    style={{ padding: '3px 10px', fontSize: 12, height: 'auto' }}
-                                    onClick={() => teamDecision({ id: req.id, status: 'REJECTED' })}
-                                  >
-                                    Отклонить
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    )}
-
                     <div className={styles.modalActions}>
                       {(() => {
                         const existingApp = myApplicationByEventId[selected.id];
@@ -1187,6 +1142,14 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                                 {STATUS_LABELS[existingApp.status] ?? existingApp.status}
                               </div>
                               {existingApp.status === 'SUBMITTED' && (
+                                <button
+                                  className={`${styles.actionBtn} ${styles.dangerBtn}`}
+                                  onClick={() => handleCancelApplication(existingApp.id)}
+                                >
+                                  Отменить заявку
+                                </button>
+                              )}
+                              {existingApp.status === 'PENDING_TEAM_APPROVAL' && (
                                 <button
                                   className={`${styles.actionBtn} ${styles.dangerBtn}`}
                                   onClick={() => handleCancelApplication(existingApp.id)}
@@ -1210,6 +1173,57 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                         Добавить в календарь
                       </button>
                     </div>
+
+                    {/* Команда — показывается только после одобрения заявки */}
+                    {selected.tag === 'Хакатон' && myTeam && (() => {
+                      const existingApp = myApplicationByEventId[selected.id];
+                      const isApproved = existingApp && existingApp.status === 'APPROVED';
+                      if (!isApproved) return null;
+                      return (
+                        <div style={{ marginTop: 16 }}>
+                          <div className={styles.sectionLabel}>Ваша команда</div>
+                          <div style={{ padding: '8px 12px', background: '#f0f4ff', borderRadius: 8, marginBottom: 8 }}>
+                            <div style={{ fontWeight: 600, fontSize: 14 }}>
+                              {myTeam.name}
+                              {isTeamLeader && <span style={{ marginLeft: 8, fontSize: 11, color: '#3B82F6' }}>(вы лидер)</span>}
+                            </div>
+                            {myTeam.memberUserIds && myTeam.memberUserIds.length > 0 && (
+                              <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
+                                Участников: {myTeam.memberUserIds.length}
+                              </div>
+                            )}
+                          </div>
+                          {isTeamLeader && pendingJoinRequests.length > 0 && (
+                            <div style={{ marginBottom: 8 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: '#1B2559', marginBottom: 6 }}>
+                                Заявки на вступление ({pendingJoinRequests.length})
+                              </div>
+                              {pendingJoinRequests.map((req) => (
+                                <div key={req.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #E2E8F0' }}>
+                                  <span style={{ fontSize: 13 }}>{req.userName || req.userId.slice(0, 8) + '...'}</span>
+                                  <div style={{ display: 'flex', gap: 6 }}>
+                                    <button
+                                      className={`${styles.actionBtn} ${styles.primaryBtn}`}
+                                      style={{ padding: '3px 10px', fontSize: 12, height: 'auto' }}
+                                      onClick={() => teamDecision({ id: req.id, status: 'APPROVED' })}
+                                    >
+                                      Принять
+                                    </button>
+                                    <button
+                                      className={`${styles.actionBtn} ${styles.dangerBtn}`}
+                                      style={{ padding: '3px 10px', fontSize: 12, height: 'auto' }}
+                                      onClick={() => teamDecision({ id: req.id, status: 'REJECTED' })}
+                                    >
+                                      Отклонить
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 ) : (
                   <div className={styles.detailPanel}>

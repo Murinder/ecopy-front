@@ -28,8 +28,10 @@ import {
   useUploadDocumentMutation,
   useDeleteDocumentMutation,
   useGetDepartmentDashboardQuery,
+  useGetProjectCommentsQuery,
+  useAddProjectCommentMutation,
 } from '../../services/projectApi';
-import type { TaskDto, ProjectDto, DocumentDto, ProjectWithTaskSummary, ProjectMemberDto } from '../../services/projectApi';
+import type { TaskDto, ProjectDto, DocumentDto, ProjectWithTaskSummary, ProjectMemberDto, ProjectCommentDto } from '../../services/projectApi';
 import { useGetTeachersQuery, useGetProfileQuery, useLazySearchUsersQuery } from '../../services/coreApi';
 
 const STATUS_RU: Record<string, string> = {
@@ -152,7 +154,7 @@ const ProjectsPage = () => {
   const [teacherTab, setTeacherTab] = useState<TeacherTabKey>('all');
   const [teacherSelectedId, setTeacherSelectedId] = useState<string | null>(null);
   const [teacherCommentDraft, setTeacherCommentDraft] = useState('');
-  const [teacherComments, setTeacherComments] = useState<Record<string, string>>({});
+  const [teacherFullViewId, setTeacherFullViewId] = useState<string | null>(null);
   const [headTab, setHeadTab] = useState<HeadTabKey>('all');
   const [headSelectedId, setHeadSelectedId] = useState<string | null>(null);
 
@@ -176,6 +178,28 @@ const ProjectsPage = () => {
   const { data: teacherDocsResp } = useGetProjectDocumentsQuery(
     teacherSelectedId || '',
     { skip: !teacherSelectedId }
+  );
+  const { data: teacherCommentsResp } = useGetProjectCommentsQuery(
+    teacherSelectedId || '',
+    { skip: !teacherSelectedId }
+  );
+  const [addProjectComment] = useAddProjectCommentMutation();
+
+  const { data: fullViewTasksResp } = useGetProjectTasksQuery(
+    teacherFullViewId || '',
+    { skip: !teacherFullViewId || teacherFullViewId === teacherSelectedId }
+  );
+  const { data: fullViewDocsResp } = useGetProjectDocumentsQuery(
+    teacherFullViewId || '',
+    { skip: !teacherFullViewId || teacherFullViewId === teacherSelectedId }
+  );
+  const { data: fullViewMembersResp } = useGetProjectMembersQuery(
+    teacherFullViewId || '',
+    { skip: !teacherFullViewId || teacherFullViewId === teacherSelectedId }
+  );
+  const { data: fullViewCommentsResp } = useGetProjectCommentsQuery(
+    teacherFullViewId || '',
+    { skip: !teacherFullViewId || teacherFullViewId === teacherSelectedId }
   );
 
   const isRealProjectId = selectedProjectId && !selectedProjectId.startsWith('demo-') && !selectedProjectId.startsWith('local-');
@@ -232,6 +256,8 @@ const ProjectsPage = () => {
   const [creating, setCreating] = useState(false);
 
   const { data: docsResp } = useGetProjectDocumentsQuery(selectedProjectId || '', { skip: !isRealProjectId });
+  const { data: studentCommentsResp } = useGetProjectCommentsQuery(selectedProjectId || '', { skip: !isRealProjectId });
+  const [studentCommentDraft, setStudentCommentDraft] = useState('');
   const [uploadDocument] = useUploadDocumentMutation();
   const [deleteDocument] = useDeleteDocumentMutation();
   const [uploading, setUploading] = useState(false);
@@ -542,7 +568,7 @@ const ProjectsPage = () => {
 
   const openTeacherModal = (id: string) => {
     setTeacherSelectedId(id);
-    setTeacherCommentDraft(teacherComments[id] || '');
+    setTeacherCommentDraft('');
   };
 
   const closeTeacherModal = () => {
@@ -550,10 +576,17 @@ const ProjectsPage = () => {
     setTeacherCommentDraft('');
   };
 
-  const sendTeacherComment = () => {
-    if (!teacherSelectedId) return;
-    setTeacherComments((prev) => ({ ...prev, [teacherSelectedId]: teacherCommentDraft.trim() }));
-    closeTeacherModal();
+  const sendTeacherComment = async () => {
+    if (!teacherSelectedId || !teacherCommentDraft.trim()) return;
+    try {
+      await addProjectComment({
+        projectId: teacherSelectedId,
+        authorId: userId,
+        authorRole: userRole === 'Преподаватель' ? 'LECTURER' : userRole === 'Заведующий кафедрой' ? 'DEPARTMENT_HEAD' : 'STUDENT',
+        content: teacherCommentDraft.trim(),
+      }).unwrap();
+      setTeacherCommentDraft('');
+    } catch { /* ignore */ }
   };
 
   // Selected student project for right panel
@@ -574,11 +607,14 @@ const ProjectsPage = () => {
   useEffect(() => {
     if (!teacherSelectedId) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeTeacherModal();
+      if (e.key === 'Escape') {
+        if (teacherFullViewId) setTeacherFullViewId(null);
+        else closeTeacherModal();
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [teacherSelectedId]);
+  }, [teacherSelectedId, teacherFullViewId]);
 
   return (
     <div className={styles.a26}>
@@ -720,6 +756,7 @@ const ProjectsPage = () => {
                           onChangeComment={setTeacherCommentDraft}
                           onClose={closeTeacherModal}
                           onSendComment={sendTeacherComment}
+                          onOpenFullView={() => setTeacherFullViewId(teacherSelectedId)}
                           members={(teacherMembersResp?.data || []).map((m) => ({
                             initials: (m.userName || '').split(' ').map((w: string) => w[0] || '').join('').toUpperCase() || m.userId.replace(/-/g, '').slice(0, 2).toUpperCase(),
                             name: m.userName || m.userId.slice(0, 8),
@@ -727,10 +764,180 @@ const ProjectsPage = () => {
                           }))}
                           tasks={teacherTasksResp?.data || []}
                           documents={teacherDocsResp?.data || []}
+                          comments={teacherCommentsResp?.data || []}
                         />
                       </div>
                     )}
                   </div>
+
+                  {/* Teacher Full View Modal */}
+                  {teacherFullViewId && (() => {
+                    const fvProject = teacherProjects.find((p) => p.id === teacherFullViewId) || null;
+                    const fvTasks = (teacherFullViewId === teacherSelectedId ? teacherTasksResp : fullViewTasksResp)?.data || [];
+                    const fvDocs = (teacherFullViewId === teacherSelectedId ? teacherDocsResp : fullViewDocsResp)?.data || [];
+                    const fvMembers = (teacherFullViewId === teacherSelectedId ? teacherMembersResp : fullViewMembersResp)?.data || [];
+                    const fvComments = (teacherFullViewId === teacherSelectedId ? teacherCommentsResp : fullViewCommentsResp)?.data || [];
+
+                    const fvGrouped: Record<string, TaskDto[]> = { TO_DO: [], IN_PROGRESS: [], REVIEW: [], DONE: [], BLOCKED: [] };
+                    fvTasks.forEach((t) => { if (fvGrouped[t.status]) fvGrouped[t.status].push(t); else fvGrouped.TO_DO.push(t); });
+
+                    const COLUMN_TITLES: Record<string, string> = {
+                      TO_DO: 'К выполнению', IN_PROGRESS: 'В процессе', REVIEW: 'На проверке', DONE: 'Выполнено', BLOCKED: 'Заблокировано',
+                    };
+
+                    const ROLE_RU_FV: Record<string, string> = {
+                      STUDENT: 'Студент', LECTURER: 'Преподаватель', DEPARTMENT_HEAD: 'Зав. кафедрой',
+                    };
+
+                    return (
+                      <div className={styles.modalOverlay} onClick={() => setTeacherFullViewId(null)}>
+                        <div className={styles.teacherFullViewModal} onClick={(e) => e.stopPropagation()}>
+                          {/* Header */}
+                          <div className={styles.fullViewHeader}>
+                            <div>
+                              <h2 className={styles.fullViewTitle}>{fvProject?.title || 'Проект'}</h2>
+                              <div className={styles.fullViewPills}>
+                                {fvProject && <span className={styles.teacherTypePill}>{fvProject.typeLabel}</span>}
+                                {fvProject && <span className={`${styles.teacherStatusPill} ${
+                                  fvProject.statusKey === 'active' ? styles.teacherStatusActive
+                                    : fvProject.statusKey === 'review' ? styles.teacherStatusReview
+                                      : fvProject.statusKey === 'delay' ? styles.teacherStatusDelay
+                                        : styles.teacherStatusDone
+                                }`}>{fvProject.statusLabel}</span>}
+                              </div>
+                            </div>
+                            <button className={styles.fullViewClose} type="button" onClick={() => setTeacherFullViewId(null)}>
+                              <img src={CloseIcon} />
+                            </button>
+                          </div>
+
+                          {fvProject?.description && (
+                            <p style={{ fontSize: 14, color: '#475569', marginBottom: 20, lineHeight: 1.5 }}>{fvProject.description}</p>
+                          )}
+
+                          {/* Team */}
+                          {fvMembers.length > 0 && (
+                            <div className={styles.fullViewSection}>
+                              <div className={styles.fullViewSectionTitle}>Команда ({fvMembers.length})</div>
+                              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                {fvMembers.map((m) => (
+                                  <div key={m.userId} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f8fafc', borderRadius: 8, padding: '6px 12px' }}>
+                                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#3b82f6', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600 }}>
+                                      {(m.userName || '').split(' ').map((w: string) => w[0] || '').join('').toUpperCase() || '??'}
+                                    </div>
+                                    <div>
+                                      <div style={{ fontSize: 13, fontWeight: 500, color: '#1e293b' }}>{m.userName || m.userId.slice(0, 8)}</div>
+                                      <div style={{ fontSize: 11, color: '#94a3b8' }}>{m.role === 'LEADER' ? 'Руководитель' : m.role === 'MENTOR' ? 'Наставник' : 'Участник'}</div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Read-only Kanban */}
+                          <div className={styles.fullViewSection}>
+                            <div className={styles.fullViewSectionTitle}>Задачи ({fvTasks.length})</div>
+                            <div className={styles.readOnlyKanban}>
+                              {(['TO_DO', 'IN_PROGRESS', 'REVIEW', 'DONE', 'BLOCKED'] as const).map((status) => (
+                                <div key={status} className={styles.readOnlyColumn}>
+                                  <div className={styles.readOnlyColumnHeader}>
+                                    <span className={styles.readOnlyColumnTitle}>{COLUMN_TITLES[status]}</span>
+                                    <span className={styles.readOnlyColumnCount}>{fvGrouped[status].length}</span>
+                                  </div>
+                                  {fvGrouped[status].map((t) => (
+                                    <div key={t.id} className={styles.readOnlyTaskCard}>
+                                      <div className={styles.readOnlyTaskTitle}>{t.title}</div>
+                                      <div className={styles.readOnlyTaskMeta}>
+                                        <span>{t.assignedToName || 'Не назначен'}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  {fvGrouped[status].length === 0 && (
+                                    <div style={{ fontSize: 12, color: '#cbd5e1', textAlign: 'center', padding: 12 }}>Пусто</div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Documents with download */}
+                          <div className={styles.fullViewSection}>
+                            <div className={styles.fullViewSectionTitle}>Документы ({fvDocs.length})</div>
+                            {fvDocs.length === 0 ? (
+                              <p style={{ fontSize: 13, color: '#94a3b8' }}>Нет документов</p>
+                            ) : (
+                              fvDocs.map((d) => {
+                                const fileName = d.filePath?.split('/').pop()?.replace(/^[a-f0-9-]+_/, '') || d.description || 'Документ';
+                                return (
+                                  <div key={d.id} className={styles.docRow}>
+                                    <div className={styles.docInfo}>
+                                      <span className={styles.docIcon}><img src={FileIcon} style={{ width: 16, height: 16 }} /></span>
+                                      <span className={styles.docName}>{fileName}</span>
+                                    </div>
+                                    <span className={styles.docDate}>{d.createdAt ? new Date(d.createdAt).toLocaleDateString('ru-RU') : ''}</span>
+                                    <button className={styles.docDownloadBtn} type="button" onClick={() => handleDownload(d.id, fileName)}>
+                                      <img src={DownloadIcon} />
+                                    </button>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+
+                          {/* Comments */}
+                          <div className={styles.fullViewSection}>
+                            <div className={styles.fullViewSectionTitle}>Комментарии ({fvComments.length})</div>
+                            {fvComments.length > 0 ? (
+                              <div className={styles.commentsList}>
+                                {fvComments.map((c) => (
+                                  <div key={c.id} className={styles.commentItem}>
+                                    <div className={styles.commentHeader}>
+                                      <span>
+                                        <span className={styles.commentAuthor}>{c.authorName}</span>
+                                        <span className={`${styles.commentRole} ${c.authorRole === 'LECTURER' || c.authorRole === 'DEPARTMENT_HEAD' ? styles.commentRoleLecturer : ''}`}>
+                                          {ROLE_RU_FV[c.authorRole] || c.authorRole}
+                                        </span>
+                                      </span>
+                                      <span className={styles.commentTime}>{new Date(c.createdAt).toLocaleString('ru-RU')}</span>
+                                    </div>
+                                    <div className={styles.commentText}>{c.content}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className={styles.commentEmpty}>Нет комментариев</div>
+                            )}
+                            <textarea
+                              className={styles.commentInput}
+                              placeholder="Добавьте комментарий..."
+                              value={teacherCommentDraft}
+                              onChange={(e) => setTeacherCommentDraft(e.target.value)}
+                            />
+                            <button
+                              className={styles.commentSendBtn}
+                              type="button"
+                              disabled={!teacherCommentDraft.trim()}
+                              onClick={async () => {
+                                if (!teacherCommentDraft.trim()) return;
+                                try {
+                                  await addProjectComment({
+                                    projectId: teacherFullViewId,
+                                    authorId: userId,
+                                    authorRole: userRole === 'Преподаватель' ? 'LECTURER' : userRole === 'Заведующий кафедрой' ? 'DEPARTMENT_HEAD' : 'STUDENT',
+                                    content: teacherCommentDraft.trim(),
+                                  }).unwrap();
+                                  setTeacherCommentDraft('');
+                                } catch { /* ignore */ }
+                              }}
+                            >
+                              Отправить
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </>
               ) : (
                 /* ═══ STUDENT VIEW ═══ */
@@ -980,6 +1187,64 @@ const ProjectsPage = () => {
                             )}
                           </div>
                         )}
+
+                        {/* Student Comments */}
+                        {isRealProjectId && (() => {
+                          const sComments = studentCommentsResp?.data || [];
+                          const ROLE_RU_S: Record<string, string> = {
+                            STUDENT: 'Студент', LECTURER: 'Преподаватель', DEPARTMENT_HEAD: 'Зав. кафедрой',
+                          };
+                          return (
+                            <div className={styles.studentRightPanelSection}>
+                              <div className={styles.studentRightPanelLabel}>Комментарии ({sComments.length})</div>
+                              {sComments.length > 0 ? (
+                                <div className={styles.commentsList}>
+                                  {sComments.map((c) => (
+                                    <div key={c.id} className={styles.commentItem}>
+                                      <div className={styles.commentHeader}>
+                                        <span>
+                                          <span className={styles.commentAuthor}>{c.authorName}</span>
+                                          <span className={`${styles.commentRole} ${c.authorRole === 'LECTURER' || c.authorRole === 'DEPARTMENT_HEAD' ? styles.commentRoleLecturer : ''}`}>
+                                            {ROLE_RU_S[c.authorRole] || c.authorRole}
+                                          </span>
+                                        </span>
+                                        <span className={styles.commentTime}>{new Date(c.createdAt).toLocaleString('ru-RU')}</span>
+                                      </div>
+                                      <div className={styles.commentText}>{c.content}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className={styles.commentEmpty}>Нет комментариев</div>
+                              )}
+                              <textarea
+                                className={styles.commentInput}
+                                placeholder="Написать комментарий..."
+                                value={studentCommentDraft}
+                                onChange={(e) => setStudentCommentDraft(e.target.value)}
+                              />
+                              <button
+                                className={styles.commentSendBtn}
+                                type="button"
+                                disabled={!studentCommentDraft.trim()}
+                                onClick={async () => {
+                                  if (!selectedProjectId || !studentCommentDraft.trim()) return;
+                                  try {
+                                    await addProjectComment({
+                                      projectId: selectedProjectId,
+                                      authorId: userId,
+                                      authorRole: 'STUDENT',
+                                      content: studentCommentDraft.trim(),
+                                    }).unwrap();
+                                    setStudentCommentDraft('');
+                                  } catch { /* ignore */ }
+                                }}
+                              >
+                                Отправить
+                              </button>
+                            </div>
+                          );
+                        })()}
                       </div>
                     ) : (
                       <div className={styles.studentRightPanel} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
@@ -1249,18 +1514,22 @@ const TeacherProjectPanel = ({
   onChangeComment,
   onClose,
   onSendComment,
+  onOpenFullView,
   members,
   tasks,
   documents,
+  comments,
 }: {
   project: TeacherProject | null;
   commentDraft: string;
   onChangeComment: (v: string) => void;
   onClose: () => void;
   onSendComment: () => void;
+  onOpenFullView: () => void;
   members?: TeacherMember[];
   tasks?: TaskDto[];
   documents?: DocumentDto[];
+  comments?: ProjectCommentDto[];
 }) => {
   if (!project) return null;
   const displayMembers = members && members.length > 0 ? members : project.members;
@@ -1274,12 +1543,12 @@ const TeacherProjectPanel = ({
           ? styles.teacherStatusDelay
           : styles.teacherStatusDone;
 
-  const openProject = () => {
-    window.alert('Открытие проекта в разработке');
-  };
-
   const requestReport = () => {
     window.alert('Запрос отчета отправлен (демо)');
+  };
+
+  const ROLE_RU: Record<string, string> = {
+    STUDENT: 'Студент', LECTURER: 'Преподаватель', DEPARTMENT_HEAD: 'Зав. кафедрой',
   };
 
   return (
@@ -1293,7 +1562,7 @@ const TeacherProjectPanel = ({
           <span className={styles.teacherTypePill} style={{ background: '#F8F9FA', border: '1px solid #E2E8F0', color: '#1B2559' }}>{project.typeLabel}</span>
           <span className={`${styles.teacherStatusPill} ${statusClass}`}>{project.statusLabel}</span>
         </div>
-        <button className={styles.teacherOpenBtn} type="button" onClick={openProject}>
+        <button className={styles.teacherOpenBtn} type="button" onClick={onOpenFullView}>
           <img src={EyeIcon} className={styles.teacherOpenIcon} />
           Открыть
         </button>
@@ -1368,16 +1637,36 @@ const TeacherProjectPanel = ({
         </>
       )}
 
-      <div className={styles.teacherSectionTitle}>Комментарий преподавателя</div>
+      <div className={styles.teacherSectionTitle}>Комментарии ({comments?.length || 0})</div>
+      {comments && comments.length > 0 ? (
+        <div className={styles.commentsList}>
+          {comments.map((c) => (
+            <div key={c.id} className={styles.commentItem}>
+              <div className={styles.commentHeader}>
+                <span>
+                  <span className={styles.commentAuthor}>{c.authorName}</span>
+                  <span className={`${styles.commentRole} ${c.authorRole === 'LECTURER' || c.authorRole === 'DEPARTMENT_HEAD' ? styles.commentRoleLecturer : ''}`}>
+                    {ROLE_RU[c.authorRole] || c.authorRole}
+                  </span>
+                </span>
+                <span className={styles.commentTime}>{new Date(c.createdAt).toLocaleString('ru-RU')}</span>
+              </div>
+              <div className={styles.commentText}>{c.content}</div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className={styles.commentEmpty}>Нет комментариев</div>
+      )}
       <textarea
-        className={styles.teacherComment}
+        className={styles.commentInput}
         placeholder="Добавьте комментарий или рекомендации для студентов..."
         value={commentDraft}
         onChange={(e) => onChangeComment(e.target.value)}
       />
 
       <div className={styles.teacherModalActions}>
-        <button className={styles.teacherPrimaryBtn} type="button" onClick={onSendComment}>
+        <button className={styles.commentSendBtn} type="button" onClick={onSendComment} disabled={!commentDraft.trim()}>
           Отправить комментарий
         </button>
         <button className={styles.teacherSecondaryBtn} type="button" onClick={requestReport}>
