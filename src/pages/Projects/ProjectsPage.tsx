@@ -20,6 +20,7 @@ import {
   useCreateTaskMutation,
   useChangeTaskStatusMutation,
   useUpdateTaskMutation,
+  useUnassignTaskMutation,
   useGetProjectMembersQuery,
   useAddProjectMemberMutation,
   useRemoveProjectMemberMutation,
@@ -28,7 +29,7 @@ import {
   useDeleteDocumentMutation,
   useGetDepartmentDashboardQuery,
 } from '../../services/projectApi';
-import type { TaskDto, ProjectDto, DocumentDto, ProjectWithTaskSummary } from '../../services/projectApi';
+import type { TaskDto, ProjectDto, DocumentDto, ProjectWithTaskSummary, ProjectMemberDto } from '../../services/projectApi';
 import { useGetTeachersQuery, useGetProfileQuery, useLazySearchUsersQuery } from '../../services/coreApi';
 
 const STATUS_RU: Record<string, string> = {
@@ -221,6 +222,7 @@ const ProjectsPage = () => {
   const [changeTaskStatus] = useChangeTaskStatusMutation();
   const [dragTask, setDragTask] = useState<TaskDto | null>(null);
   const [updateTask] = useUpdateTaskMutation();
+  const [unassignTask] = useUnassignTaskMutation();
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState<string>('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -397,6 +399,25 @@ const ProjectsPage = () => {
       onEditTitleCancel();
     }
   };
+
+  const handleAssignTask = async (taskId: string, assignToUserId: string | null) => {
+    try {
+      if (assignToUserId) {
+        await updateTask({ taskId, assignedTo: assignToUserId }).unwrap();
+      } else {
+        await unassignTask(taskId).unwrap();
+      }
+    } catch (err: unknown) {
+      const apiErr = err as { data?: { message?: string } };
+      setTaskError(apiErr?.data?.message || 'Не удалось изменить исполнителя');
+    }
+  };
+
+  // Determine current user's role in the selected project
+  const currentUserProjectRole = useMemo(() => {
+    const member = studentMembers.find((m) => m.userId === userId);
+    return member?.role || null;
+  }, [studentMembers, userId]);
 
   const teacherProjects: TeacherProject[] = useMemo(() => {
     const base: TeacherProject[] = projects.length
@@ -905,11 +926,11 @@ const ProjectsPage = () => {
                             </div>
                           )}
                           <div className={styles.projectsPage10}>
-                            <KanbanColumn title="К выполнению" count={grouped.TO_DO.length} tasks={grouped.TO_DO} onAddTask={() => onAddTask('TO_DO')} onDragStart={onDragStartTask} onDrop={() => onDropToColumn('TO_DO')} editingTaskId={editingTaskId} editingTitle={editingTitle} onEditTitleStart={onEditTitleStart} onEditTitleChange={onEditTitleChange} onEditTitleCommit={onEditTitleCommit} onEditTitleCancel={onEditTitleCancel} />
-                            <KanbanColumn title="В процессе" count={grouped.IN_PROGRESS.length} tasks={grouped.IN_PROGRESS} onAddTask={() => onAddTask('IN_PROGRESS')} onDragStart={onDragStartTask} onDrop={() => onDropToColumn('IN_PROGRESS')} editingTaskId={editingTaskId} editingTitle={editingTitle} onEditTitleStart={onEditTitleStart} onEditTitleChange={onEditTitleChange} onEditTitleCommit={onEditTitleCommit} onEditTitleCancel={onEditTitleCancel} />
-                            <KanbanColumn title="На проверке" count={grouped.REVIEW.length} tasks={grouped.REVIEW} onAddTask={() => onAddTask('REVIEW')} onDragStart={onDragStartTask} onDrop={() => onDropToColumn('REVIEW')} editingTaskId={editingTaskId} editingTitle={editingTitle} onEditTitleStart={onEditTitleStart} onEditTitleChange={onEditTitleChange} onEditTitleCommit={onEditTitleCommit} onEditTitleCancel={onEditTitleCancel} />
-                            <KanbanColumn title="Выполнено" count={grouped.DONE.length} tasks={grouped.DONE} onAddTask={() => onAddTask('DONE')} onDragStart={onDragStartTask} onDrop={() => onDropToColumn('DONE')} editingTaskId={editingTaskId} editingTitle={editingTitle} onEditTitleStart={onEditTitleStart} onEditTitleChange={onEditTitleChange} onEditTitleCommit={onEditTitleCommit} onEditTitleCancel={onEditTitleCancel} />
-                            <KanbanColumn title="Заблокировано" count={grouped.BLOCKED.length} tasks={grouped.BLOCKED} onAddTask={() => onAddTask('BLOCKED')} onDragStart={onDragStartTask} onDrop={() => onDropToColumn('BLOCKED')} editingTaskId={editingTaskId} editingTitle={editingTitle} onEditTitleStart={onEditTitleStart} onEditTitleChange={onEditTitleChange} onEditTitleCommit={onEditTitleCommit} onEditTitleCancel={onEditTitleCancel} />
+                            <KanbanColumn title="К выполнению" count={grouped.TO_DO.length} tasks={grouped.TO_DO} onAddTask={() => onAddTask('TO_DO')} onDragStart={onDragStartTask} onDrop={() => onDropToColumn('TO_DO')} editingTaskId={editingTaskId} editingTitle={editingTitle} onEditTitleStart={onEditTitleStart} onEditTitleChange={onEditTitleChange} onEditTitleCommit={onEditTitleCommit} onEditTitleCancel={onEditTitleCancel} members={studentMembers} currentUserId={userId} currentUserProjectRole={currentUserProjectRole} onAssignTask={handleAssignTask} />
+                            <KanbanColumn title="В процессе" count={grouped.IN_PROGRESS.length} tasks={grouped.IN_PROGRESS} onAddTask={() => onAddTask('IN_PROGRESS')} onDragStart={onDragStartTask} onDrop={() => onDropToColumn('IN_PROGRESS')} editingTaskId={editingTaskId} editingTitle={editingTitle} onEditTitleStart={onEditTitleStart} onEditTitleChange={onEditTitleChange} onEditTitleCommit={onEditTitleCommit} onEditTitleCancel={onEditTitleCancel} members={studentMembers} currentUserId={userId} currentUserProjectRole={currentUserProjectRole} onAssignTask={handleAssignTask} />
+                            <KanbanColumn title="На проверке" count={grouped.REVIEW.length} tasks={grouped.REVIEW} onAddTask={() => onAddTask('REVIEW')} onDragStart={onDragStartTask} onDrop={() => onDropToColumn('REVIEW')} editingTaskId={editingTaskId} editingTitle={editingTitle} onEditTitleStart={onEditTitleStart} onEditTitleChange={onEditTitleChange} onEditTitleCommit={onEditTitleCommit} onEditTitleCancel={onEditTitleCancel} members={studentMembers} currentUserId={userId} currentUserProjectRole={currentUserProjectRole} onAssignTask={handleAssignTask} />
+                            <KanbanColumn title="Выполнено" count={grouped.DONE.length} tasks={grouped.DONE} onAddTask={() => onAddTask('DONE')} onDragStart={onDragStartTask} onDrop={() => onDropToColumn('DONE')} editingTaskId={editingTaskId} editingTitle={editingTitle} onEditTitleStart={onEditTitleStart} onEditTitleChange={onEditTitleChange} onEditTitleCommit={onEditTitleCommit} onEditTitleCancel={onEditTitleCancel} members={studentMembers} currentUserId={userId} currentUserProjectRole={currentUserProjectRole} onAssignTask={handleAssignTask} />
+                            <KanbanColumn title="Заблокировано" count={grouped.BLOCKED.length} tasks={grouped.BLOCKED} onAddTask={() => onAddTask('BLOCKED')} onDragStart={onDragStartTask} onDrop={() => onDropToColumn('BLOCKED')} editingTaskId={editingTaskId} editingTitle={editingTitle} onEditTitleStart={onEditTitleStart} onEditTitleChange={onEditTitleChange} onEditTitleCommit={onEditTitleCommit} onEditTitleCancel={onEditTitleCancel} members={studentMembers} currentUserId={userId} currentUserProjectRole={currentUserProjectRole} onAssignTask={handleAssignTask} />
                           </div>
                           {tasksLoading && <div style={{ padding: 8, color: '#6a7282', fontSize: 13 }}>Загрузка задач...</div>}
                           {tasksError && <div style={{ padding: 8, color: '#6a7282', fontSize: 13 }}>API недоступно — режим офлайн.</div>}
@@ -1430,6 +1451,10 @@ const KanbanColumn = ({
   onEditTitleChange,
   onEditTitleCommit,
   onEditTitleCancel,
+  members,
+  currentUserId,
+  currentUserProjectRole,
+  onAssignTask,
 }: {
   title: string;
   count: number;
@@ -1443,7 +1468,13 @@ const KanbanColumn = ({
   onEditTitleChange: (title: string) => void;
   onEditTitleCommit: (taskId: string, title: string) => void;
   onEditTitleCancel: () => void;
+  members: ProjectMemberDto[];
+  currentUserId: string;
+  currentUserProjectRole: string | null;
+  onAssignTask: (taskId: string, userId: string | null) => void;
 }) => {
+  const isLeader = currentUserProjectRole === 'LEADER';
+
   return (
     <div
       className={styles.container23}
@@ -1459,15 +1490,19 @@ const KanbanColumn = ({
         </div>
       </div>
       <div className={styles.container22}>
-        {tasks.map((t) => (
-          <div
-            key={t.id}
-            className={styles.card3}
-            draggable={editingTaskId !== t.id}
-            onDragStart={() => onDragStart(t)}
-          >
-            <div className={styles.cardContent}>
-              <div className={styles.projectsPage5}>
+        {tasks.map((t) => {
+          const isAssignedToMe = t.assignedTo === currentUserId;
+          const isUnassigned = !t.assignedTo;
+          const canChangeAssignee = isLeader || isUnassigned || isAssignedToMe;
+
+          return (
+            <div
+              key={t.id}
+              className={styles.card3}
+              draggable={editingTaskId !== t.id}
+              onDragStart={() => onDragStart(t)}
+            >
+              <div className={styles.cardContent}>
                 <div className={styles.paragraph3}>
                   {editingTaskId === t.id ? (
                     <input
@@ -1491,20 +1526,44 @@ const KanbanColumn = ({
                     </p>
                   )}
                 </div>
-              </div>
-              <div className={styles.taskCardFooter}>
-                <div className={styles.badge3}>
-                  <p className={styles.a32}>{STATUS_RU[t.status] || t.status}</p>
+                <div className={styles.taskCardRow}>
+                  <span className={styles.taskCardLabel}>Статус</span>
+                  <div className={styles.badge3}>
+                    <p className={styles.a32}>{STATUS_RU[t.status] || t.status}</p>
+                  </div>
                 </div>
-                {t.assignedToName && (
-                  <span className={styles.taskAssignee} title={t.assignedToName}>
-                    {t.assignedToName}
-                  </span>
-                )}
+                <div className={styles.taskCardRow}>
+                  <span className={styles.taskCardLabel}>Исполнитель</span>
+                  {canChangeAssignee ? (
+                    <select
+                      className={styles.taskAssigneeSelect}
+                      value={t.assignedTo || ''}
+                      onChange={(e) => onAssignTask(t.id, e.target.value || null)}
+                    >
+                      <option value="">Не назначен</option>
+                      {isLeader
+                        ? members.map((m) => (
+                            <option key={m.userId} value={m.userId}>
+                              {m.userName || m.userId}
+                            </option>
+                          ))
+                        : (
+                            <option value={currentUserId}>
+                              {members.find((m) => m.userId === currentUserId)?.userName || 'Я'}
+                            </option>
+                          )
+                      }
+                    </select>
+                  ) : (
+                    <span className={styles.taskAssignee} title={t.assignedToName || ''}>
+                      {t.assignedToName || 'Не назначен'}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         <div className={styles.button10} onClick={onAddTask}>
           <img src={AddTaskIcon} className={styles.icon4} />
           <p className={styles.a23}>Добавить задачу</p>

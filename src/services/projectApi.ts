@@ -126,11 +126,18 @@ export const projectApi = createApi({
       }),
       invalidatesTags: ['Tasks'],
     }),
-    updateTask: builder.mutation<ApiResponse<TaskDto>, { taskId: string; title?: string; description?: string }>({
+    updateTask: builder.mutation<ApiResponse<TaskDto>, { taskId: string; title?: string; description?: string; assignedTo?: string }>({
       query: ({ taskId, ...body }) => ({
         url: `/api/v1/tasks/${taskId}`,
         method: 'PATCH',
         body,
+      }),
+      invalidatesTags: ['Tasks'],
+    }),
+    unassignTask: builder.mutation<ApiResponse<TaskDto>, string>({
+      query: (taskId) => ({
+        url: `/api/v1/tasks/${taskId}/assignee`,
+        method: 'DELETE',
       }),
       invalidatesTags: ['Tasks'],
     }),
@@ -193,6 +200,7 @@ export const {
   useGetProjectTasksQuery,
   useCreateTaskMutation,
   useUpdateTaskMutation,
+  useUnassignTaskMutation,
   useChangeTaskStatusMutation,
   useGetProjectMembersQuery,
   useAddProjectMemberMutation,

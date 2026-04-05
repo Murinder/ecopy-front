@@ -22,7 +22,7 @@ import {
 import type { LessonDto, DefenseDto as ApiDefenseDto } from '../../services/eventApi';
 import { useGetStudentsQuery, useGetGroupsQuery } from '../../services/coreApi';
 
-type WeekdayKey = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI';
+type WeekdayKey = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
 type LessonType = 'Лекция' | 'Семинар' | 'Практика' | 'Другое';
 
 type TimeSlot = {
@@ -65,6 +65,8 @@ const weekdayOptions: { key: WeekdayKey; label: string }[] = [
   { key: 'WED', label: 'Среда' },
   { key: 'THU', label: 'Четверг' },
   { key: 'FRI', label: 'Пятница' },
+  { key: 'SAT', label: 'Суббота' },
+  { key: 'SUN', label: 'Воскресенье' },
 ];
 
 const timeSlots: TimeSlot[] = [
@@ -102,9 +104,9 @@ const addMonth = (year: number, month0: number, delta: number) => {
 
 type DateEntry = { date: Date; dateIso: string; weekday: WeekdayKey; label: string };
 
-const weekdayShort: Record<WeekdayKey, string> = { MON: 'Пн', TUE: 'Вт', WED: 'Ср', THU: 'Чт', FRI: 'Пт' };
+const weekdayShort: Record<WeekdayKey, string> = { MON: 'Пн', TUE: 'Вт', WED: 'Ср', THU: 'Чт', FRI: 'Пт', SAT: 'Сб', SUN: 'Вс' };
 
-const dayIndexToWeekday: (WeekdayKey | null)[] = [null, 'MON', 'TUE', 'WED', 'THU', 'FRI', null];
+const dayIndexToWeekday: WeekdayKey[] = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
 const getWeekStart = (ref: Date): Date => {
   const d = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
@@ -127,7 +129,6 @@ const generateWeekDates = (weekStart: Date, count: 1 | 2): DateEntry[] => {
     const d = new Date(weekStart);
     d.setDate(d.getDate() + i);
     const wd = dayIndexToWeekday[d.getDay()];
-    if (!wd) continue;
     result.push({
       date: d,
       dateIso: dateIsoFromDate(d),
@@ -142,7 +143,7 @@ const ruGenitive = ['января','февраля','марта','апреля',
 
 const formatWeekRange = (weekStart: Date, count: 1 | 2): string => {
   const fri = new Date(weekStart);
-  fri.setDate(fri.getDate() + (count === 1 ? 4 : 11));
+  fri.setDate(fri.getDate() + (count === 1 ? 6 : 13));
   const d1 = weekStart.getDate();
   const m1 = weekStart.getMonth();
   const d2 = fri.getDate();
@@ -184,10 +185,10 @@ const CheckIconSvg = ({ className }: { className?: string }) => (
 );
 
 const backendDayToWeekday: Record<string, WeekdayKey> = {
-  MONDAY: 'MON', TUESDAY: 'TUE', WEDNESDAY: 'WED', THURSDAY: 'THU', FRIDAY: 'FRI', SATURDAY: 'FRI',
+  MONDAY: 'MON', TUESDAY: 'TUE', WEDNESDAY: 'WED', THURSDAY: 'THU', FRIDAY: 'FRI', SATURDAY: 'SAT', SUNDAY: 'SUN',
 };
 const weekdayToBackendDay: Record<WeekdayKey, string> = {
-  MON: 'MONDAY', TUE: 'TUESDAY', WED: 'WEDNESDAY', THU: 'THURSDAY', FRI: 'FRIDAY',
+  MON: 'MONDAY', TUE: 'TUESDAY', WED: 'WEDNESDAY', THU: 'THURSDAY', FRI: 'FRIDAY', SAT: 'SATURDAY', SUN: 'SUNDAY',
 };
 const backendTypeToLabel: Record<string, LessonType> = {
   LECTURE: 'Лекция', SEMINAR: 'Семинар', PRACTICE: 'Практика', OTHER: 'Другое',
@@ -316,7 +317,7 @@ const TeacherScheduleView = ({ avatarInitials, userId }: { avatarInitials: strin
     return [...m.entries()];
   }, [lessons]);
 
-  const openAdd = () => { setAddError(''); setEditingLessonId(null); setIsAddOpen(true); };
+  const openAdd = () => { setEditMode(false); setAddError(''); setEditingLessonId(null); setIsAddOpen(true); };
   const closeAdd = () => { setIsAddOpen(false); setEditingLessonId(null); };
 
   const openEdit = (lesson: Lesson) => {

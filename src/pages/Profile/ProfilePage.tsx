@@ -33,6 +33,11 @@ import {
   useGetDepartmentQuery,
   useGetHeadProfileDetailsQuery,
   useGetTeacherProfileDetailsQuery,
+  useGetStudentApplicationsQuery,
+  useCreateApplicationMutation,
+  useAddApplicationCommentMutation,
+  useWithdrawApplicationMutation,
+  useGetTeachersQuery,
 } from '../../services/coreApi';
 import { useGetRatingBreakdownQuery } from '../../services/ratingApi';
 import {
@@ -40,7 +45,7 @@ import {
   useUploadUserDocumentMutation,
   useDeleteUserDocumentMutation,
 } from '../../services/coreApi';
-import type { UserDocumentDto } from '../../services/coreApi';
+import type { UserDocumentDto, ApplicationViewDto, ApplicationStatusType } from '../../services/coreApi';
 
 const initialsFromName = (name: string) =>
   name
@@ -175,6 +180,18 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
   const [showLangForm, setShowLangForm] = useState(false);
   const [pendingLangProficiencies, setPendingLangProficiencies] = useState<Record<string, string>>({});
   const [showDocuments, setShowDocuments] = useState(false);
+  // Applications state
+  const [appTab, setAppTab] = useState<'active' | 'completed'>('active');
+  const [showCreateApp, setShowCreateApp] = useState(false);
+  const [selectedApp, setSelectedApp] = useState<ApplicationViewDto | null>(null);
+  const [createAppKind, setCreateAppKind] = useState('RESOURCE_REQUEST');
+  const [createAppDesc, setCreateAppDesc] = useState('');
+  const [createAppTeacher, setCreateAppTeacher] = useState('');
+  const [createAppCustomKind, setCreateAppCustomKind] = useState('');
+  const [teacherSearch, setTeacherSearch] = useState('');
+  const [createAppError, setCreateAppError] = useState<string | null>(null);
+  const [appComment, setAppComment] = useState('');
+
   const { data: profileData, isLoading, isError, refetch: refetchProfile } = useGetProfileQuery(userId, { skip: !userId });
   const { data: linksData } = useGetUserLinksQuery(userId, { skip: !userId });
   const { data: skillsData } = useGetUserSkillsQuery(userId, { skip: !userId });
@@ -195,6 +212,80 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
   const [deleteUserSkill] = useDeleteUserSkillMutation();
   const [createUserLanguage] = useCreateUserLanguageMutation();
   const [deleteUserLanguage] = useDeleteUserLanguageMutation();
+  // Applications queries and mutations
+  const { data: appsData } = useGetStudentApplicationsQuery(userId, { skip: !userId });
+  const { data: teachersData } = useGetTeachersQuery();
+  const [createApplication] = useCreateApplicationMutation();
+  const [addApplicationComment] = useAddApplicationCommentMutation();
+  const [withdrawApplication] = useWithdrawApplicationMutation();
+
+  const allApps: ApplicationViewDto[] = appsData?.data ?? [];
+  const ACTIVE_STATUSES: ApplicationStatusType[] = ['PENDING', 'REVISION', 'ADMIN_REVIEW', 'IN_PROGRESS'];
+  const filteredApps = allApps.filter(a => appTab === 'active' ? ACTIVE_STATUSES.includes(a.status) : !ACTIVE_STATUSES.includes(a.status));
+  const activeCount = allApps.filter(a => ACTIVE_STATUSES.includes(a.status)).length;
+  const completedCount = allApps.length - activeCount;
+
+  const kindLabelMap: Record<string, string> = {
+    RESOURCE_REQUEST: 'Запрос ресурсов', EQUIPMENT_REQUEST: 'Запрос техники',
+    ROOM_REQUEST: 'Запрос кабинета', OTHER: 'Другое',
+    PROJECT: 'Проект', CONSULT: 'Консультация', VKR: 'ВКР',
+  };
+  const getKindLabel = (app: ApplicationViewDto) => {
+    if (app.kind === 'OTHER' && app.category) return app.category;
+    return kindLabelMap[app.kind] ?? app.kind;
+  };
+  const statusLabelMap: Record<string, string> = {
+    PENDING: 'На рассмотрении', REVISION: 'На доработке', ADMIN_REVIEW: 'Подтверждение зав. каф.',
+    IN_PROGRESS: 'В процессе', COMPLETED: 'Исполнена', REJECTED: 'Отклонено',
+    WITHDRAWN: 'Отозвано', APPROVED: 'Одобрено',
+  };
+  const statusColorMap: Record<string, string> = {
+    PENDING: '#f59e0b', REVISION: '#8b5cf6', ADMIN_REVIEW: '#3b82f6',
+    IN_PROGRESS: '#06b6d4', COMPLETED: '#22c55e', REJECTED: '#ef4444',
+    WITHDRAWN: '#94a3b8', APPROVED: '#22c55e',
+  };
+
+  const teachersList = (teachersData?.data ?? []).filter(t => {
+    if (!teacherSearch) return true;
+    const name = [t.firstName, t.lastName].filter(Boolean).join(' ').toLowerCase();
+    return name.includes(teacherSearch.toLowerCase());
+  });
+
+  const handleCreateApp = async () => {
+    if (!createAppTeacher || !createAppDesc.trim()) {
+      setCreateAppError('Заполните все обязательные поля');
+      return;
+    }
+    try {
+      await createApplication({ studentId: userId, body: { kind: createAppKind, description: createAppDesc.trim(), lecturerId: createAppTeacher, category: createAppKind === 'OTHER' && createAppCustomKind.trim() ? createAppCustomKind.trim() : undefined } }).unwrap();
+      setShowCreateApp(false);
+      setCreateAppKind('RESOURCE_REQUEST');
+      setCreateAppDesc('');
+      setCreateAppTeacher('');
+      setCreateAppCustomKind('');
+      setTeacherSearch('');
+      setCreateAppError(null);
+    } catch (err: any) {
+      setCreateAppError(err?.data?.message || 'Ошибка создания заявки');
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!selectedApp || !appComment.trim()) return;
+    try {
+      const result = await addApplicationComment({ applicationId: selectedApp.id, authorId: userId, content: appComment.trim() }).unwrap();
+      setAppComment('');
+      setSelectedApp(result.data);
+    } catch { /* ignore */ }
+  };
+
+  const handleWithdraw = async () => {
+    if (!selectedApp) return;
+    try {
+      await withdrawApplication(selectedApp.id).unwrap();
+      setSelectedApp(null);
+    } catch { /* ignore */ }
+  };
 
   const initial = useMemo<Profile>(() => {
     const d = profileData?.data;
@@ -784,17 +875,276 @@ const StudentProfileView = ({ userName, userId }: { userName: string; userId: st
               </div>
             </div>
 
-            {showDocuments && (
-              <DocumentsSection userId={userId} />
-            )}
+            {/* ===== Мои заявки ===== */}
+            <div className={styles.card} style={{ gridColumn: '1 / -1', marginTop: 18 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#0e1d45' }}>Мои заявки</h3>
+                <button
+                  onClick={() => setShowCreateApp(true)}
+                  style={{ padding: '8px 18px', background: '#3a76f0', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 500, fontSize: 14 }}
+                >
+                  + Создать заявку
+                </button>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                <button
+                  onClick={() => setAppTab('active')}
+                  style={{ padding: '6px 16px', borderRadius: 20, border: 'none', cursor: 'pointer', fontWeight: 500, fontSize: 13, background: appTab === 'active' ? '#3a76f0' : '#f1f5f9', color: appTab === 'active' ? '#fff' : '#64748b' }}
+                >
+                  Активные ({activeCount})
+                </button>
+                <button
+                  onClick={() => setAppTab('completed')}
+                  style={{ padding: '6px 16px', borderRadius: 20, border: 'none', cursor: 'pointer', fontWeight: 500, fontSize: 13, background: appTab === 'completed' ? '#3a76f0' : '#f1f5f9', color: appTab === 'completed' ? '#fff' : '#64748b' }}
+                >
+                  Завершённые ({completedCount})
+                </button>
+              </div>
+              {filteredApps.length === 0 ? (
+                <div style={{ color: '#94a3b8', textAlign: 'center', padding: '24px 0', fontSize: 14 }}>
+                  {appTab === 'active' ? 'Нет активных заявок' : 'Нет завершённых заявок'}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {filteredApps.map(app => (
+                    <div
+                      key={app.id}
+                      onClick={() => setSelectedApp(app)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: '#f9fafb', borderRadius: 10, cursor: 'pointer', transition: 'background 0.15s' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '#f9fafb')}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: '#0e1d45', marginBottom: 2 }}>
+                          {app.title || `Заявка №${app.applicationNumber ?? '—'}`}
+                        </div>
+                        <div style={{ fontSize: 12, color: '#64748b' }}>
+                          {app.description ? (app.description.length > 80 ? app.description.slice(0, 80) + '...' : app.description) : '—'}
+                        </div>
+                      </div>
+                      <span style={{ padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600, background: '#e0e7ff', color: '#3a76f0', whiteSpace: 'nowrap' }}>
+                        {getKindLabel(app)}
+                      </span>
+                      <span style={{ padding: '3px 10px', borderRadius: 12, fontSize: 11, fontWeight: 600, color: '#fff', background: statusColorMap[app.status] ?? '#94a3b8', whiteSpace: 'nowrap' }}>
+                        {statusLabelMap[app.status] ?? app.status}
+                      </span>
+                      <div style={{ fontSize: 12, color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                        {app.lecturerName || '—'}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                        {app.submittedAt}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
           </div>
+
+          {/* Create Application Modal */}
+          {showCreateApp && (
+            <div className={styles.docsModalOverlay} onClick={() => setShowCreateApp(false)}>
+              <div className={styles.docsModal} onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#0e1d45' }}>Создать заявку</h3>
+                  <span onClick={() => setShowCreateApp(false)} role="button" tabIndex={0} style={{ cursor: 'pointer', fontSize: 22, color: '#94a3b8', lineHeight: 1 }}>&times;</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div>
+                    <label style={{ fontWeight: 500, fontSize: 13, color: '#334155', display: 'block', marginBottom: 6 }}>Тип заявки *</label>
+                    <select
+                      value={createAppKind}
+                      onChange={e => setCreateAppKind(e.target.value)}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 14, background: '#fff' }}
+                    >
+                      <option value="RESOURCE_REQUEST">Запрос ресурсов</option>
+                      <option value="EQUIPMENT_REQUEST">Запрос техники</option>
+                      <option value="ROOM_REQUEST">Запрос кабинета</option>
+                      <option value="OTHER">Другое</option>
+                    </select>
+                  </div>
+                  {createAppKind === 'OTHER' && (
+                    <div>
+                      <label style={{ fontWeight: 500, fontSize: 13, color: '#334155', display: 'block', marginBottom: 6 }}>Уточните тип заявки</label>
+                      <input
+                        type="text"
+                        value={createAppCustomKind}
+                        onChange={e => setCreateAppCustomKind(e.target.value)}
+                        placeholder="Например: Доступ к серверу, Справка и т.д."
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 14 }}
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <label style={{ fontWeight: 500, fontSize: 13, color: '#334155', display: 'block', marginBottom: 6 }}>Описание *</label>
+                    <textarea
+                      value={createAppDesc}
+                      onChange={e => setCreateAppDesc(e.target.value)}
+                      placeholder="Опишите, что вам необходимо, зачем и в каких целях"
+                      rows={4}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 14, resize: 'vertical', fontFamily: 'inherit' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontWeight: 500, fontSize: 13, color: '#334155', display: 'block', marginBottom: 6 }}>Согласующий (преподаватель) *</label>
+                    <input
+                      type="text"
+                      value={teacherSearch}
+                      onChange={e => { setTeacherSearch(e.target.value); setCreateAppTeacher(''); }}
+                      placeholder="Поиск по имени преподавателя"
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 14 }}
+                    />
+                    {teacherSearch && !createAppTeacher && (
+                      <div style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8, marginTop: 4, background: '#fff' }}>
+                        {teachersList.slice(0, 10).map(t => {
+                          const name = [t.firstName, t.lastName].filter(Boolean).join(' ');
+                          return (
+                            <div
+                              key={t.id}
+                              onClick={() => { setCreateAppTeacher(t.id!); setTeacherSearch(name); }}
+                              style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 14, borderBottom: '1px solid #f1f5f9' }}
+                              onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')}
+                              onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
+                            >
+                              {name}
+                              {t.departmentId ? <span style={{ color: '#94a3b8', marginLeft: 8, fontSize: 12 }}>Кафедра</span> : null}
+                            </div>
+                          );
+                        })}
+                        {teachersList.length === 0 && <div style={{ padding: '8px 12px', color: '#94a3b8', fontSize: 14 }}>Преподаватель не найден</div>}
+                      </div>
+                    )}
+                    {createAppTeacher && <div style={{ marginTop: 4, fontSize: 12, color: '#22c55e' }}>Выбрано: {teacherSearch}</div>}
+                  </div>
+                  {createAppError && <div style={{ color: '#ef4444', fontSize: 13 }}>{createAppError}</div>}
+                  <button
+                    onClick={handleCreateApp}
+                    style={{ padding: '10px 0', background: '#3a76f0', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 15 }}
+                  >
+                    Создать
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Application Detail Modal */}
+          {selectedApp && (
+            <div className={styles.docsModalOverlay} onClick={() => { setSelectedApp(null); setAppComment(''); }}>
+              <div className={styles.docsModal} onClick={e => e.stopPropagation()} style={{ maxWidth: 600, maxHeight: '80vh', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#0e1d45' }}>
+                    {selectedApp.title || `Заявка №${selectedApp.applicationNumber ?? '—'}`}
+                  </h3>
+                  <span onClick={() => { setSelectedApp(null); setAppComment(''); }} role="button" tabIndex={0} style={{ cursor: 'pointer', fontSize: 22, color: '#94a3b8', lineHeight: 1 }}>&times;</span>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                  <span style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: '#e0e7ff', color: '#3a76f0' }}>
+                    {selectedApp.kind === 'OTHER' && selectedApp.category ? selectedApp.category : kindLabelMap[selectedApp.kind] ?? selectedApp.kind}
+                  </span>
+                  <span style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600, color: '#fff', background: statusColorMap[selectedApp.status] ?? '#94a3b8' }}>
+                    {statusLabelMap[selectedApp.status] ?? selectedApp.status}
+                  </span>
+                  <span style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, color: '#64748b', background: '#f1f5f9' }}>
+                    {selectedApp.submittedAt}
+                  </span>
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 500, fontSize: 13, color: '#334155', marginBottom: 4 }}>Описание</div>
+                  <div style={{ fontSize: 14, color: '#475569', lineHeight: 1.5 }}>{selectedApp.description || '—'}</div>
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 500, fontSize: 13, color: '#334155', marginBottom: 4 }}>Согласование</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 13, color: '#64748b', minWidth: 110 }}>Преподаватель:</span>
+                      <span style={{ fontSize: 14, fontWeight: 500, color: '#0e1d45' }}>{selectedApp.lecturerName || '—'}</span>
+                      {['PENDING', 'REVISION'].includes(selectedApp.status) && <span style={{ fontSize: 11, color: '#f59e0b' }}>Ожидание</span>}
+                      {['ADMIN_REVIEW', 'IN_PROGRESS', 'COMPLETED', 'APPROVED'].includes(selectedApp.status) && <span style={{ fontSize: 11, color: '#22c55e' }}>Одобрено</span>}
+                      {selectedApp.status === 'REJECTED' && <span style={{ fontSize: 11, color: '#ef4444' }}>Отклонено</span>}
+                    </div>
+                    {['RESOURCE_REQUEST', 'EQUIPMENT_REQUEST', 'ROOM_REQUEST'].includes(selectedApp.kind) && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 13, color: '#64748b', minWidth: 110 }}>Зав. кафедрой:</span>
+                        {selectedApp.status === 'ADMIN_REVIEW' && <span style={{ fontSize: 11, color: '#f59e0b' }}>Ожидание</span>}
+                        {selectedApp.status === 'IN_PROGRESS' && <span style={{ fontSize: 11, color: '#06b6d4' }}>В процессе</span>}
+                        {selectedApp.status === 'COMPLETED' && <span style={{ fontSize: 11, color: '#22c55e' }}>Исполнено</span>}
+                        {!['ADMIN_REVIEW', 'IN_PROGRESS', 'COMPLETED'].includes(selectedApp.status) && <span style={{ fontSize: 11, color: '#94a3b8' }}>—</span>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Comments */}
+                {(selectedApp.comments ?? []).length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontWeight: 500, fontSize: 13, color: '#334155', marginBottom: 8 }}>Комментарии</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {(selectedApp.comments ?? []).map(c => (
+                        <div key={c.id} style={{ background: '#f9fafb', borderRadius: 8, padding: '10px 12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <span style={{ fontWeight: 600, fontSize: 13, color: '#0e1d45' }}>{c.authorName}</span>
+                            <span style={{ fontSize: 11, color: '#94a3b8' }}>{c.createdAt}</span>
+                          </div>
+                          <div style={{ fontSize: 14, color: '#475569' }}>{c.content}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Add comment field (visible when REVISION) */}
+                {selectedApp.status === 'REVISION' && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontWeight: 500, fontSize: 13, color: '#334155', marginBottom: 6 }}>Ответ на запрос доработки</div>
+                    <textarea
+                      value={appComment}
+                      onChange={e => setAppComment(e.target.value)}
+                      placeholder="Напишите ответ..."
+                      rows={3}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 14, resize: 'vertical', fontFamily: 'inherit', marginBottom: 8 }}
+                    />
+                    <button
+                      onClick={handleAddComment}
+                      disabled={!appComment.trim()}
+                      style={{ padding: '8px 18px', background: appComment.trim() ? '#3a76f0' : '#cbd5e1', color: '#fff', border: 'none', borderRadius: 8, cursor: appComment.trim() ? 'pointer' : 'default', fontWeight: 500, fontSize: 14 }}
+                    >
+                      Добавить
+                    </button>
+                  </div>
+                )}
+
+                {/* Withdraw button */}
+                {ACTIVE_STATUSES.includes(selectedApp.status) && (
+                  <button
+                    onClick={handleWithdraw}
+                    style={{ padding: '8px 18px', background: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 500, fontSize: 14 }}
+                  >
+                    Отозвать заявку
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {showDocuments && (
+            <div className={styles.docsModalOverlay} onClick={() => setShowDocuments(false)}>
+              <div className={styles.docsModal} onClick={(e) => e.stopPropagation()}>
+                <DocumentsSection userId={userId} onClose={() => setShowDocuments(false)} />
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-const DocumentsSection = ({ userId }: { userId: string }) => {
+const DocumentsSection = ({ userId, onClose }: { userId: string; onClose: () => void }) => {
   const { data: docsResp } = useGetUserDocumentsQuery(userId);
   const documents = docsResp?.data ?? [];
   const [uploadUserDocument] = useUploadUserDocumentMutation();
@@ -802,6 +1152,14 @@ const DocumentsSection = ({ userId }: { userId: string }) => {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [onClose]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -851,30 +1209,33 @@ const DocumentsSection = ({ userId }: { userId: string }) => {
   };
 
   return (
-    <div className={styles.card} style={{ gridColumn: '1 / -1' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <div className={styles.cardTitle}>Мои документы</div>
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '6px 14px',
-            borderRadius: 8,
-            background: '#3a76f0',
-            color: '#fff',
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: uploading ? 'not-allowed' : 'pointer',
-            opacity: uploading ? 0.6 : 1,
-            border: 'none',
-          }}
-        >
-          {uploading ? 'Загрузка...' : '+ Загрузить'}
-        </button>
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ fontSize: 17, fontWeight: 700, color: '#0a0a0a' }}>Мои документы</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '6px 14px',
+              borderRadius: 8,
+              background: '#3a76f0',
+              color: '#fff',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: uploading ? 'not-allowed' : 'pointer',
+              opacity: uploading ? 0.6 : 1,
+              border: 'none',
+            }}
+          >
+            {uploading ? 'Загрузка...' : '+ Загрузить'}
+          </button>
+          <button className={styles.docsModalClose} onClick={onClose} type="button">×</button>
+        </div>
         <input ref={fileInputRef} type="file" style={{ display: 'none' }} onChange={handleUpload} disabled={uploading} />
       </div>
       {uploadError && <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 8 }}>{uploadError}</p>}
@@ -905,7 +1266,7 @@ const DocumentsSection = ({ userId }: { userId: string }) => {
           </button>
         </div>
       ))}
-    </div>
+    </>
   );
 };
 

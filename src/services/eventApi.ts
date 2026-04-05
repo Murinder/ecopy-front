@@ -4,7 +4,7 @@ import type { ApiResponse } from './types';
 
 export interface EventViewDto {
   id: string;
-  tag: 'Хакатон' | 'Карьера' | 'Обучение';
+  tag: 'Хакатон' | 'Конференция' | 'Акселератор' | 'Карьера' | 'Обучение';
   title: string;
   description: string;
   date: string;
@@ -17,11 +17,12 @@ export interface EventViewDto {
   dateISO?: string;
   endDateISO?: string;
   organizerName?: string;
+  eventType?: string;
 }
 
 export interface TeacherEventViewDto {
   id: string;
-  type: 'Консультация' | 'Лекция' | 'Семинар' | 'Защита';
+  type: 'Консультация' | 'Хакатон' | 'Конференция' | 'Акселератор' | 'Другое';
   title: string;
   subtitle: string;
   dateISO: string;
@@ -48,11 +49,16 @@ export interface EventApplicationDto {
   id: string;
   eventId: string;
   userId: string;
-  status: 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'WAITLISTED';
+  status: 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'WAITLISTED' | 'PENDING_TEAM_APPROVAL';
   motivation?: string;
   skills?: string;
   createdAt: string;
   updatedAt: string;
+  participantRole?: string;
+  presentationTitle?: string;
+  presentationDescription?: string;
+  teamId?: string;
+  userName?: string;
 }
 
 export interface CreateEventApplicationDto {
@@ -60,6 +66,11 @@ export interface CreateEventApplicationDto {
   userId: string;
   motivation?: string;
   skills?: string;
+  participantRole?: string;
+  presentationTitle?: string;
+  presentationDescription?: string;
+  teamId?: string;
+  teamName?: string;
 }
 
 export interface TeamDto {
@@ -68,6 +79,7 @@ export interface TeamDto {
   name: string;
   createdBy: string;
   createdAt: string;
+  memberUserIds?: string[];
 }
 
 export interface CreateTeamDto {
@@ -263,6 +275,23 @@ export const eventApi = createApi({
       query: ({ teamId, userId }) => ({ url: `/api/v1/team-members/${teamId}/${userId}`, method: 'DELETE' }),
       invalidatesTags: ['Teams'],
     }),
+
+    // Team join requests
+    getTeamJoinRequests: builder.query<EventApplicationDto[], { eventId: string; teamId: string }>({
+      query: ({ eventId, teamId }) => ({
+        url: '/api/v1/event-applications/by-team',
+        params: { eventId, teamId },
+      }),
+      providesTags: ['Applications'],
+    }),
+    teamDecision: builder.mutation<EventApplicationDto, { id: string; status: string }>({
+      query: ({ id, status }) => ({
+        url: `/api/v1/event-applications/${id}/team-decision`,
+        method: 'PUT',
+        body: { status },
+      }),
+      invalidatesTags: ['Applications', 'Teams'],
+    }),
   }),
 });
 
@@ -285,4 +314,6 @@ export const {
   useCreateTeamMutation,
   useJoinTeamMutation,
   useLeaveTeamMutation,
+  useGetTeamJoinRequestsQuery,
+  useTeamDecisionMutation,
 } = eventApi;

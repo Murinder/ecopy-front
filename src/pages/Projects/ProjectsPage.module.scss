@@ -709,13 +709,12 @@
 .container28 {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-width: 140px;
+  flex: 1 1 0;
+  min-width: 0;
   border-radius: 10px;
   background: var(--bg-card-light);
   padding: 12px 12px 0;
   gap: 12px;
-  width: 100%;
 }
 .container21,
 .container24 {
@@ -758,6 +757,8 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
+  overflow: hidden;
 }
 .card3,
 .card4,
@@ -769,6 +770,9 @@
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   background: #ffffff;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 .cardContent,
 .cardContent2,
@@ -778,6 +782,9 @@
   flex-direction: column;
   gap: 8px;
   padding: 12px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 .projectsPage5,
 .projectsPage6,
@@ -842,13 +849,41 @@
   justify-content: space-between;
   gap: 8px;
 }
-.taskAssignee {
+.taskCardRow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+}
+.taskCardLabel {
   font-size: 11px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+.taskAssignee {
+  font-size: 12px;
   color: #6b7280;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 120px;
+}
+.taskAssigneeSelect {
+  font-size: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 2px 6px;
+  background: #fff;
+  color: #364153;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  cursor: pointer;
+  outline: none;
+  &:focus {
+    border-color: var(--accent-primary);
+  }
 }
 .badge4,
 .badge5 {

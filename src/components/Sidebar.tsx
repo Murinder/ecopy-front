@@ -40,6 +40,7 @@ const navForRole = (role: string): { portalSubtitle: string; items: NavItem[] } 
       items: [
         { key: 'teachers', label: 'Преподаватели', icon: PeopleIcon, path: '/teachers' },
         { key: 'top-projects', label: 'Топ проекты', icon: ProjectsIcon, path: '/projects' },
+        { key: 'applications', label: 'Заявки', icon: FileIcon, path: '/applications' },
         { key: 'analytics', label: 'Аналитика', icon: ActivityIcon, path: '/activity' },
         { key: 'defense', label: 'Расписание защит', icon: ScheduleIcon, path: '/schedule' },
         { key: 'reports', label: 'Отчеты', icon: ReportsIcon, path: '/reports' },

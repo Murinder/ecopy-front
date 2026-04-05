@@ -136,19 +136,36 @@ export interface StudentInfoDto {
   initials: string;
 }
 
+export type ApplicationStatusType = 'PENDING' | 'APPROVED' | 'REJECTED' | 'REVISION' | 'ADMIN_REVIEW' | 'IN_PROGRESS' | 'COMPLETED' | 'WITHDRAWN';
+export type ApplicationKindType = 'PROJECT' | 'CONSULT' | 'VKR' | 'RESOURCE_REQUEST' | 'EQUIPMENT_REQUEST' | 'ROOM_REQUEST' | 'OTHER';
+
+export interface ApplicationCommentDto {
+  id: string;
+  applicationId: string;
+  authorId: string;
+  authorRole: string;
+  authorName: string;
+  content: string;
+  createdAt: string;
+}
+
 export interface ApplicationViewDto {
   id: string;
   title: string;
   description: string;
   submittedAt: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: ApplicationStatusType;
   priority: 'HIGH' | 'MEDIUM' | 'LOW';
-  kind: 'PROJECT' | 'CONSULT' | 'VKR';
+  kind: ApplicationKindType;
   student: StudentInfoDto;
   category: string;
   duration: string;
   teamSize: string;
   teacherReply?: string;
+  applicationNumber?: number;
+  adminId?: string;
+  lecturerName?: string;
+  comments?: ApplicationCommentDto[];
 }
 
 export interface UserLinkDto {
@@ -440,6 +457,41 @@ export const coreApi = createApi({
       }),
       providesTags: ['Applications'],
     }),
+    getAdminApplications: builder.query<ApiResponse<ApplicationViewDto[]>, void>({
+      query: () => ({
+        url: '/api/v1/applications/admin/pending',
+      }),
+      providesTags: ['Applications'],
+    }),
+    createApplication: builder.mutation<
+      ApiResponse<ApplicationViewDto>,
+      { studentId: string; body: { kind: string; description: string; lecturerId: string; category?: string } }
+    >({
+      query: ({ studentId, body }) => ({
+        url: `/api/v1/applications?studentId=${studentId}`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Applications'],
+    }),
+    addApplicationComment: builder.mutation<
+      ApiResponse<ApplicationViewDto>,
+      { applicationId: string; authorId: string; content: string }
+    >({
+      query: ({ applicationId, ...body }) => ({
+        url: `/api/v1/applications/${applicationId}/comments`,
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Applications'],
+    }),
+    withdrawApplication: builder.mutation<ApiResponse<ApplicationViewDto>, string>({
+      query: (applicationId) => ({
+        url: `/api/v1/applications/${applicationId}/withdraw`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: ['Applications'],
+    }),
     getDashboardSummary: builder.query<ApiResponse<DashboardSummaryDto>, string>({
       query: (userId) => ({
         url: `/api/v1/dashboards/${userId}/summary`,
@@ -567,6 +619,10 @@ export const {
   useGetGroupsQuery,
   useGetLecturerApplicationsQuery,
   useGetStudentApplicationsQuery,
+  useGetAdminApplicationsQuery,
+  useCreateApplicationMutation,
+  useAddApplicationCommentMutation,
+  useWithdrawApplicationMutation,
   useUpdateApplicationStatusMutation,
   useGetDashboardSummaryQuery,
   useGetUserLinksQuery,

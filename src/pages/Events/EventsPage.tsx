@@ -22,12 +22,12 @@ import {
   useCancelApplicationMutation,
   useGetMyApplicationsQuery,
   useGetEventTeamsQuery,
-  useCreateTeamMutation,
-  useJoinTeamMutation,
+  useGetTeamJoinRequestsQuery,
+  useTeamDecisionMutation,
 } from '../../services/eventApi';
 import type { TeacherEventViewDto } from '../../services/eventApi';
 
-type EventTag = 'Хакатон' | 'Карьера' | 'Обучение';
+type EventTag = 'Хакатон' | 'Конференция' | 'Акселератор' | 'Карьера' | 'Обучение';
 
 type EventItem = {
   id: string;
@@ -43,9 +43,10 @@ type EventItem = {
   dateISO?: string;
   endDateISO?: string;
   organizerName?: string;
+  eventType?: string;
 };
 
-type TeacherEventType = 'Консультация' | 'Лекция' | 'Семинар' | 'Защита';
+type TeacherEventType = 'Консультация' | 'Хакатон' | 'Конференция' | 'Акселератор' | 'Карьера' | 'Другое';
 
 type TeacherEvent = {
   id: string;
@@ -153,9 +154,10 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
 
   const teacherTypePillClass = (t: TeacherEventType) => {
     if (t === 'Консультация') return `${styles.teacherTypePill} ${styles.teacherTypeBlue}`;
-    if (t === 'Лекция') return `${styles.teacherTypePill} ${styles.teacherTypeOrange}`;
-    if (t === 'Семинар') return `${styles.teacherTypePill} ${styles.teacherTypePurple}`;
-    return `${styles.teacherTypePill} ${styles.teacherTypeGreen}`;
+    if (t === 'Хакатон') return `${styles.teacherTypePill} ${styles.teacherTypeOrange}`;
+    if (t === 'Конференция') return `${styles.teacherTypePill} ${styles.teacherTypePurple}`;
+    if (t === 'Акселератор') return `${styles.teacherTypePill} ${styles.teacherTypeGreen}`;
+    return `${styles.teacherTypePill} ${styles.teacherTypeGray}`;
   };
 
 
@@ -269,7 +271,7 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
         format: teacherCreateOnline ? 'ONLINE' : 'OFFLINE',
         eventType: teacherCreateType,
         createdBy: userId,
-        location: teacherCreateOnline ? 'Онлайн (Zoom)' : teacherCreatePlace.trim() || undefined,
+        location: teacherCreateOnline ? (teacherCreatePlace.trim() || 'Онлайн') : (teacherCreatePlace.trim() || undefined),
       }).unwrap();
       setTeacherCreateOpen(false);
     } catch (err: unknown) {
@@ -410,7 +412,7 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                         {dayEvents.length > 0 && (
                           <div className={styles.teacherDayDots}>
                             {dayEvents.slice(0, 3).map((ev, i) => (
-                              <span key={i} className={`${styles.teacherDot} ${styles[`teacherDot${ev.type === 'Консультация' ? 'Blue' : ev.type === 'Лекция' ? 'Orange' : ev.type === 'Семинар' ? 'Purple' : 'Green'}`]}`} />
+                              <span key={i} className={`${styles.teacherDot} ${styles[`teacherDot${ev.type === 'Консультация' ? 'Blue' : ev.type === 'Хакатон' ? 'Orange' : ev.type === 'Конференция' ? 'Purple' : ev.type === 'Акселератор' ? 'Green' : 'Gray'}`]}`} />
                             ))}
                           </div>
                         )}
@@ -436,7 +438,7 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                         if (ev.key === 'Enter' || ev.key === ' ') setTeacherSelectedId(e.id);
                       }}
                     >
-                      <div className={styles.teacherUpcomingStripe} style={{ backgroundColor: e.type === 'Консультация' ? '#2563eb' : e.type === 'Лекция' ? '#d97706' : e.type === 'Семинар' ? '#7e22ce' : '#16a34a' }} />
+                      <div className={styles.teacherUpcomingStripe} style={{ backgroundColor: e.type === 'Консультация' ? '#2563eb' : e.type === 'Хакатон' ? '#d97706' : e.type === 'Конференция' ? '#7e22ce' : e.type === 'Акселератор' ? '#16a34a' : '#475569' }} />
                       <div className={styles.teacherUpcomingBody}>
                         <div className={styles.teacherUpcomingClock}>{e.time}</div>
                         <div className={styles.teacherUpcomingName}>{e.title}</div>
@@ -541,15 +543,17 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                   value={teacherCreateType}
                   onChange={(e) => {
                     const v = e.target.value;
-                    if (v === 'Консультация' || v === 'Лекция' || v === 'Семинар' || v === 'Защита') setTeacherCreateType(v);
+                    if (v === 'Консультация' || v === 'Хакатон' || v === 'Конференция' || v === 'Акселератор' || v === 'Другое') setTeacherCreateType(v);
                     else setTeacherCreateType('');
                   }}
                 >
                   <option value="">Выберите тип</option>
                   <option value="Консультация">Консультация</option>
-                  <option value="Лекция">Лекция</option>
-                  <option value="Семинар">Семинар</option>
-                  <option value="Защита">Защита</option>
+                  <option value="Хакатон">Хакатон</option>
+                  <option value="Конференция">Конференция</option>
+                  <option value="Акселератор">Акселератор</option>
+                  <option value="Карьера">Карьера</option>
+                  <option value="Другое">Другое</option>
                 </select>
               </div>
 
@@ -569,7 +573,7 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                   <input className={styles.teacherInput} type="date" value={teacherCreateDate} onChange={(e) => setTeacherCreateDate(e.target.value)} />
                 </div>
                 <div className={styles.teacherField}>
-                  <div className={styles.teacherLabel}>Время</div>
+                  <div className={styles.teacherLabel}>Время начала</div>
                   <input className={styles.teacherInput} type="time" value={teacherCreateTime} onChange={(e) => setTeacherCreateTime(e.target.value)} />
                 </div>
               </div>
@@ -580,13 +584,12 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                   <input className={styles.teacherInput} inputMode="numeric" value={teacherCreateDuration} onChange={(e) => setTeacherCreateDuration(e.target.value)} />
                 </div>
                 <div className={styles.teacherField}>
-                  <div className={styles.teacherLabel}>Место</div>
+                  <div className={styles.teacherLabel}>{teacherCreateOnline ? 'Ссылка для подключения' : 'Место'}</div>
                   <input
                     className={styles.teacherInput}
-                    placeholder="Кабинет 401"
+                    placeholder={teacherCreateOnline ? 'https://zoom.us/...' : 'Кабинет 401'}
                     value={teacherCreatePlace}
                     onChange={(e) => setTeacherCreatePlace(e.target.value)}
-                    disabled={teacherCreateOnline}
                   />
                 </div>
               </div>
@@ -647,6 +650,7 @@ const STATUS_LABELS: Record<string, string> = {
   APPROVED: 'Одобрено',
   REJECTED: 'Отклонено',
   WAITLISTED: 'В листе ожидания',
+  PENDING_TEAM_APPROVAL: 'Ожидает одобрения команды',
 };
 
 const STATUS_STYLES: Record<string, string> = {
@@ -654,6 +658,7 @@ const STATUS_STYLES: Record<string, string> = {
   APPROVED: 'statusApproved',
   REJECTED: 'statusRejected',
   WAITLISTED: 'statusWaitlisted',
+  PENDING_TEAM_APPROVAL: 'statusPending',
 };
 
 const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
@@ -670,14 +675,17 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
   const [applySkills, setApplySkills] = useState('');
   const [applyExperience, setApplyExperience] = useState('');
   const [applyTelegram, setApplyTelegram] = useState('');
-  const [applyTeamRole, setApplyTeamRole] = useState('');
   const [applyError, setApplyError] = useState<string | null>(null);
-  const [teamModalEventId, setTeamModalEventId] = useState<string | null>(null);
   const [createTeamName, setCreateTeamName] = useState('');
-  const [createTeamOpen, setCreateTeamOpen] = useState(false);
-  const [createTeam] = useCreateTeamMutation();
-  const [joinTeam] = useJoinTeamMutation();
-  const [userJoinedTeamId, setUserJoinedTeamId] = useState<string | null>(null);
+  const [teamDecision] = useTeamDecisionMutation();
+
+  // New state for redesigned modal
+  const [applyParticipantRole, setApplyParticipantRole] = useState<'PARTICIPANT' | 'OBSERVER' | ''>('');
+  const [applyPresentationTitle, setApplyPresentationTitle] = useState('');
+  const [applyPresentationDescription, setApplyPresentationDescription] = useState('');
+  const [hackathonMode, setHackathonMode] = useState<'create' | 'join' | null>(null);
+  const [selectedJoinTeamId, setSelectedJoinTeamId] = useState<string | null>(null);
+  const [teamSearchQuery, setTeamSearchQuery] = useState('');
 
   const myApplications = useMemo(() => myApplicationsData ?? [], [myApplicationsData]);
   const myApplicationByEventId = useMemo(() => {
@@ -686,14 +694,28 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
     return map;
   }, [myApplications]);
 
-  const teamsEventId = teamModalEventId ?? selectedId ?? '';
+  const teamsEventId = selectedId ?? '';
   const { data: eventTeamsData } = useGetEventTeamsQuery(teamsEventId, { skip: !teamsEventId });
   const eventTeams = useMemo(() => eventTeamsData ?? [], [eventTeamsData]);
 
-  const isInTeam = useMemo(() => {
-    if (userJoinedTeamId) return true;
-    return eventTeams.some((t) => t.createdBy === userId);
-  }, [eventTeams, userId, userJoinedTeamId]);
+  const myTeam = useMemo(() => {
+    return eventTeams.find((t) =>
+      t.createdBy === userId || (t.memberUserIds ?? []).includes(userId ?? '')
+    );
+  }, [eventTeams, userId]);
+
+  const isTeamLeader = useMemo(() => {
+    return myTeam?.createdBy === userId;
+  }, [myTeam, userId]);
+
+  const { data: teamJoinRequestsData } = useGetTeamJoinRequestsQuery(
+    { eventId: teamsEventId, teamId: myTeam?.id ?? '' },
+    { skip: !isTeamLeader || !myTeam?.id || !teamsEventId }
+  );
+  const pendingJoinRequests = useMemo(() =>
+    (teamJoinRequestsData ?? []).filter((a) => a.status === 'PENDING_TEAM_APPROVAL'),
+    [teamJoinRequestsData]
+  );
 
   const upcoming = useMemo<EventItem[]>(() => {
     if (apiEvents?.success && apiEvents.data.length > 0) {
@@ -713,6 +735,7 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
           dateISO: e.dateISO,
           endDateISO: e.endDateISO,
           organizerName: e.organizerName,
+          eventType: e.eventType,
         }));
     }
     return [];
@@ -736,6 +759,7 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
           dateISO: e.dateISO,
           endDateISO: e.endDateISO,
           organizerName: e.organizerName,
+          eventType: e.eventType,
         }));
     }
     return [];
@@ -751,11 +775,18 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
 
   const pillClass = (tag: EventTag) => {
     if (tag === 'Хакатон') return `${styles.pill} ${styles.pillPurple}`;
+    if (tag === 'Конференция') return `${styles.pill} ${styles.pillBlue}`;
+    if (tag === 'Акселератор') return `${styles.pill} ${styles.pillOrange}`;
     if (tag === 'Карьера') return `${styles.pill} ${styles.pillBlue}`;
     return `${styles.pill} ${styles.pillGreen}`;
   };
 
   const closeModal = () => setSelectedId(null);
+
+  const applyModalEvent = useMemo(() => {
+    if (!applyModalEventId) return undefined;
+    return [...upcoming, ...past].find((e) => e.id === applyModalEventId);
+  }, [applyModalEventId, upcoming, past]);
 
   const openApplyModal = (eventId: string) => {
     setApplyModalEventId(eventId);
@@ -763,7 +794,13 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
     setApplySkills('');
     setApplyExperience('');
     setApplyTelegram('');
-    setApplyTeamRole('');
+    setApplyParticipantRole('');
+    setApplyPresentationTitle('');
+    setApplyPresentationDescription('');
+    setHackathonMode(null);
+    setSelectedJoinTeamId(null);
+    setTeamSearchQuery('');
+    setCreateTeamName('');
     setApplyError(null);
   };
 
@@ -772,16 +809,68 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
   const submitApply = async () => {
     if (!applyModalEventId || !userId) return;
     setApplyError(null);
+    const eventType = applyModalEvent?.eventType;
+
     try {
-      const motivationParts = [applyMotivation];
-      if (applyExperience.trim()) motivationParts.push(`Опыт: ${applyExperience.trim()}`);
-      if (applyTelegram.trim()) motivationParts.push(`Telegram: ${applyTelegram.trim()}`);
-      if (applyTeamRole) motivationParts.push(`Роль: ${applyTeamRole}`);
-      const fullMotivation = motivationParts.join('\n\n');
-      await applyToEvent({ eventId: applyModalEventId, userId, motivation: fullMotivation, skills: applySkills }).unwrap();
+      if (eventType === 'Конференция' || eventType === 'Акселератор' || eventType === 'Карьера') {
+        if (!applyParticipantRole) {
+          setApplyError('Выберите роль: Участник или Наблюдатель');
+          return;
+        }
+        if (applyParticipantRole === 'PARTICIPANT' && !applyPresentationTitle.trim()) {
+          setApplyError('Укажите название выступления');
+          return;
+        }
+        await applyToEvent({
+          eventId: applyModalEventId,
+          userId,
+          participantRole: applyParticipantRole,
+          presentationTitle: applyParticipantRole === 'PARTICIPANT' ? applyPresentationTitle : undefined,
+          presentationDescription: applyParticipantRole === 'PARTICIPANT' ? applyPresentationDescription : undefined,
+          skills: applySkills || undefined,
+        }).unwrap();
+      } else if (eventType === 'Хакатон') {
+        if (!hackathonMode) {
+          setApplyError('Выберите: создать команду или присоединиться');
+          return;
+        }
+        if (hackathonMode === 'create') {
+          if (!createTeamName.trim()) {
+            setApplyError('Укажите название команды');
+            return;
+          }
+          await applyToEvent({
+            eventId: applyModalEventId,
+            userId,
+            participantRole: 'TEAM_CREATOR',
+            teamName: createTeamName.trim(),
+            motivation: applyMotivation || undefined,
+            skills: applySkills || undefined,
+          }).unwrap();
+        } else {
+          if (!selectedJoinTeamId) {
+            setApplyError('Выберите команду');
+            return;
+          }
+          await applyToEvent({
+            eventId: applyModalEventId,
+            userId,
+            participantRole: 'TEAM_JOINER',
+            teamId: selectedJoinTeamId,
+            motivation: applyMotivation || undefined,
+            skills: applySkills || undefined,
+          }).unwrap();
+        }
+      } else {
+        const motivationParts = [applyMotivation];
+        if (applyExperience.trim()) motivationParts.push(`Опыт: ${applyExperience.trim()}`);
+        if (applyTelegram.trim()) motivationParts.push(`Telegram: ${applyTelegram.trim()}`);
+        const fullMotivation = motivationParts.join('\n\n');
+        await applyToEvent({ eventId: applyModalEventId, userId, motivation: fullMotivation, skills: applySkills }).unwrap();
+      }
       closeApplyModal();
-    } catch {
-      setApplyError('Ошибка при подаче заявки');
+    } catch (err: any) {
+      setApplyError(err?.data?.message || 'Ошибка при подаче заявки');
     }
   };
 
@@ -789,23 +878,6 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
     await cancelApplication(applicationId).catch(() => {});
   };
 
-  const handleJoinTeam = async (teamId: string) => {
-    if (!userId || isInTeam) return;
-    try {
-      await joinTeam({ teamId, userId, role: 'member' }).unwrap();
-      setUserJoinedTeamId(teamId);
-    } catch { /* handled by RTK */ }
-  };
-
-  const handleCreateTeam = async () => {
-    if (!teamModalEventId || !createTeamName.trim() || isInTeam) return;
-    try {
-      const created = await createTeam({ eventId: teamModalEventId, name: createTeamName.trim() }).unwrap();
-      setUserJoinedTeamId(created.id);
-    } catch { /* handled by RTK */ }
-    setCreateTeamName('');
-    setCreateTeamOpen(false);
-  };
 
   useEffect(() => {
     if (!selectedId) return;
@@ -1060,58 +1132,47 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                       ))}
                     </div>
 
-                    {selected.tag === 'Хакатон' && (
+                    {selected.tag === 'Хакатон' && myTeam && (
                       <>
-                        <div className={styles.sectionLabel}>Команды</div>
-                        {isInTeam && (
-                          <p style={{ color: '#05CD99', fontSize: 13, marginBottom: 8 }}>Вы уже состоите в команде</p>
-                        )}
-                        <div style={{ marginBottom: 8 }}>
-                          {eventTeams.map((team) => (
-                            <div key={team.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #E2E8F0' }}>
-                              <span>
-                                {team.name}
-                                {(team.createdBy === userId || userJoinedTeamId === team.id) && (
-                                  <span style={{ marginLeft: 8, fontSize: 11, color: '#3B82F6' }}>(ваша)</span>
-                                )}
-                              </span>
-                              {team.createdBy !== userId && !isInTeam && (
-                                <button className={`${styles.actionBtn} ${styles.mutedBtn}`} style={{ padding: '4px 10px', fontSize: 12, height: 'auto' }} onClick={() => handleJoinTeam(team.id)}>
-                                  Вступить
-                                </button>
-                              )}
+                        <div className={styles.sectionLabel}>Ваша команда</div>
+                        <div style={{ padding: '8px 12px', background: '#f0f4ff', borderRadius: 8, marginBottom: 8 }}>
+                          <div style={{ fontWeight: 600, fontSize: 14 }}>
+                            {myTeam.name}
+                            {isTeamLeader && <span style={{ marginLeft: 8, fontSize: 11, color: '#3B82F6' }}>(вы лидер)</span>}
+                          </div>
+                          {myTeam.memberUserIds && myTeam.memberUserIds.length > 0 && (
+                            <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
+                              Участников: {myTeam.memberUserIds.length}
                             </div>
-                          ))}
-                          {eventTeams.length === 0 && <p style={{ color: '#A3AED0', fontSize: 13 }}>Команд пока нет</p>}
+                          )}
                         </div>
-                        {!isInTeam && (
-                          <>
-                            {!createTeamOpen ? (
-                              <button
-                                className={`${styles.actionBtn} ${styles.mutedBtn}`}
-                                style={{ marginBottom: 12, height: 36, fontSize: 13 }}
-                                onClick={() => { setTeamModalEventId(selected.id); setCreateTeamOpen(true); }}
-                              >
-                                + Создать команду
-                              </button>
-                            ) : (
-                              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                                <input
-                                  className={styles.teacherInput}
-                                  placeholder="Название команды"
-                                  value={createTeamName}
-                                  onChange={(e) => setCreateTeamName(e.target.value)}
-                                  style={{ height: 36, fontSize: 13 }}
-                                />
-                                <button className={`${styles.actionBtn} ${styles.primaryBtn}`} style={{ height: 36, fontSize: 13, padding: '0 12px' }} onClick={handleCreateTeam} disabled={!createTeamName.trim()}>
-                                  Создать
-                                </button>
-                                <button className={`${styles.actionBtn} ${styles.dangerBtn}`} style={{ height: 36, fontSize: 13, padding: '0 12px' }} onClick={() => setCreateTeamOpen(false)}>
-                                  Отмена
-                                </button>
+                        {isTeamLeader && pendingJoinRequests.length > 0 && (
+                          <div style={{ marginBottom: 8 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: '#1B2559', marginBottom: 6 }}>
+                              Заявки на вступление ({pendingJoinRequests.length})
+                            </div>
+                            {pendingJoinRequests.map((req) => (
+                              <div key={req.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #E2E8F0' }}>
+                                <span style={{ fontSize: 13 }}>{req.userName || req.userId.slice(0, 8) + '...'}</span>
+                                <div style={{ display: 'flex', gap: 6 }}>
+                                  <button
+                                    className={`${styles.actionBtn} ${styles.primaryBtn}`}
+                                    style={{ padding: '3px 10px', fontSize: 12, height: 'auto' }}
+                                    onClick={() => teamDecision({ id: req.id, status: 'APPROVED' })}
+                                  >
+                                    Принять
+                                  </button>
+                                  <button
+                                    className={`${styles.actionBtn} ${styles.dangerBtn}`}
+                                    style={{ padding: '3px 10px', fontSize: 12, height: 'auto' }}
+                                    onClick={() => teamDecision({ id: req.id, status: 'REJECTED' })}
+                                  >
+                                    Отклонить
+                                  </button>
+                                </div>
                               </div>
-                            )}
-                          </>
+                            ))}
+                          </div>
                         )}
                       </>
                     )}
@@ -1161,77 +1222,211 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
         </div>
       </div>
 
-      {applyModalEventId && (
+      {applyModalEventId && applyModalEvent && (
         <div className={styles.modalOverlay} onClick={closeApplyModal}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
             <div className={styles.modalTop}>
-              <div className={styles.modalTitle} style={{ fontSize: 18 }}>Подать заявку</div>
+              <div className={styles.modalTitle} style={{ fontSize: 18 }}>Регистрация на мероприятие</div>
               <button className={styles.closeBtn} onClick={closeApplyModal} aria-label="Закрыть">
                 <img src={CloseIcon} className={styles.closeIcon} />
               </button>
             </div>
-            <div className={styles.teacherField} style={{ marginTop: 16 }}>
-              <div className={styles.teacherLabel}>Мотивация *</div>
-              <textarea
-                className={styles.teacherTextarea}
-                placeholder="Расскажите, почему хотите участвовать"
-                value={applyMotivation}
-                onChange={(e) => setApplyMotivation(e.target.value)}
-                rows={4}
-              />
-            </div>
-            <div className={styles.teacherField} style={{ marginTop: 12 }}>
-              <div className={styles.teacherLabel}>Навыки</div>
-              <input
-                className={styles.teacherInput}
-                placeholder="Например: Python, ML, React"
-                value={applySkills}
-                onChange={(e) => setApplySkills(e.target.value)}
-              />
-            </div>
-            <div className={styles.teacherField} style={{ marginTop: 12 }}>
-              <div className={styles.teacherLabel}>Опыт участия</div>
-              <textarea
-                className={styles.teacherTextarea}
-                placeholder="Расскажите о вашем опыте в похожих мероприятиях"
-                value={applyExperience}
-                onChange={(e) => setApplyExperience(e.target.value)}
-                rows={3}
-              />
-            </div>
-            <div className={styles.teacherField} style={{ marginTop: 12 }}>
-              <div className={styles.teacherLabel}>Контактный Telegram</div>
-              <input
-                className={styles.teacherInput}
-                placeholder="@username"
-                value={applyTelegram}
-                onChange={(e) => setApplyTelegram(e.target.value)}
-              />
-            </div>
-            <div className={styles.teacherField} style={{ marginTop: 12 }}>
-              <div className={styles.teacherLabel}>Желаемая роль в команде</div>
-              <select
-                className={styles.teacherSelect}
-                value={applyTeamRole}
-                onChange={(e) => setApplyTeamRole(e.target.value)}
-              >
-                <option value="">Не выбрано</option>
-                <option value="Разработчик">Разработчик</option>
-                <option value="Дизайнер">Дизайнер</option>
-                <option value="Аналитик">Аналитик</option>
-                <option value="Менеджер">Менеджер</option>
-                <option value="Другое">Другое</option>
-              </select>
-            </div>
+
+            {/* === Конференция / Акселератор / Карьера === */}
+            {(applyModalEvent.eventType === 'Конференция' || applyModalEvent.eventType === 'Акселератор' || applyModalEvent.eventType === 'Карьера') && (
+              <>
+                <div className={styles.teacherField} style={{ marginTop: 16 }}>
+                  <div className={styles.teacherLabel}>Роль участия *</div>
+                  <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 14 }}>
+                      <input type="radio" name="participantRole" value="PARTICIPANT" checked={applyParticipantRole === 'PARTICIPANT'} onChange={() => setApplyParticipantRole('PARTICIPANT')} />
+                      Участник
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 14 }}>
+                      <input type="radio" name="participantRole" value="OBSERVER" checked={applyParticipantRole === 'OBSERVER'} onChange={() => setApplyParticipantRole('OBSERVER')} />
+                      Наблюдатель
+                    </label>
+                  </div>
+                </div>
+                {applyParticipantRole === 'PARTICIPANT' && (
+                  <>
+                    <div className={styles.teacherField} style={{ marginTop: 12 }}>
+                      <div className={styles.teacherLabel}>Название выступления *</div>
+                      <input
+                        className={styles.teacherInput}
+                        placeholder="Тема вашего доклада"
+                        value={applyPresentationTitle}
+                        onChange={(e) => setApplyPresentationTitle(e.target.value)}
+                      />
+                    </div>
+                    <div className={styles.teacherField} style={{ marginTop: 12 }}>
+                      <div className={styles.teacherLabel}>Краткое описание</div>
+                      <textarea
+                        className={styles.teacherTextarea}
+                        placeholder="Опишите содержание выступления"
+                        value={applyPresentationDescription}
+                        onChange={(e) => setApplyPresentationDescription(e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+                    <div className={styles.teacherField} style={{ marginTop: 12 }}>
+                      <div className={styles.teacherLabel}>Навыки</div>
+                      <input
+                        className={styles.teacherInput}
+                        placeholder="Например: Python, ML, React"
+                        value={applySkills}
+                        onChange={(e) => setApplySkills(e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            {/* === Хакатон === */}
+            {applyModalEvent.eventType === 'Хакатон' && (
+              <>
+                <div className={styles.teacherField} style={{ marginTop: 16 }}>
+                  <div className={styles.teacherLabel}>Команда *</div>
+                  <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 14 }}>
+                      <input type="radio" name="hackathonMode" value="create" checked={hackathonMode === 'create'} onChange={() => { setHackathonMode('create'); setSelectedJoinTeamId(null); }} />
+                      Создать команду
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 14 }}>
+                      <input type="radio" name="hackathonMode" value="join" checked={hackathonMode === 'join'} onChange={() => { setHackathonMode('join'); setCreateTeamName(''); }} />
+                      Присоединиться
+                    </label>
+                  </div>
+                </div>
+                {hackathonMode === 'create' && (
+                  <div className={styles.teacherField} style={{ marginTop: 12 }}>
+                    <div className={styles.teacherLabel}>Название команды *</div>
+                    <input
+                      className={styles.teacherInput}
+                      placeholder="Придумайте название"
+                      value={createTeamName}
+                      onChange={(e) => setCreateTeamName(e.target.value)}
+                    />
+                  </div>
+                )}
+                {hackathonMode === 'join' && (
+                  <div className={styles.teacherField} style={{ marginTop: 12 }}>
+                    <div className={styles.teacherLabel}>Выберите команду *</div>
+                    <input
+                      className={styles.teacherInput}
+                      placeholder="Поиск по названию..."
+                      value={teamSearchQuery}
+                      onChange={(e) => setTeamSearchQuery(e.target.value)}
+                      style={{ marginBottom: 8 }}
+                    />
+                    <div style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid #E2E8F0', borderRadius: 8 }}>
+                      {eventTeams
+                        .filter((t) => t.name.toLowerCase().includes(teamSearchQuery.toLowerCase()))
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map((team) => (
+                          <div
+                            key={team.id}
+                            onClick={() => setSelectedJoinTeamId(team.id)}
+                            style={{
+                              padding: '8px 12px',
+                              cursor: 'pointer',
+                              fontSize: 13,
+                              background: selectedJoinTeamId === team.id ? '#dbeafe' : 'transparent',
+                              borderBottom: '1px solid #f1f5f9',
+                            }}
+                          >
+                            {team.name}
+                            <span style={{ marginLeft: 8, fontSize: 11, color: '#94a3b8' }}>
+                              ({(team.memberUserIds ?? []).length} чел.)
+                            </span>
+                          </div>
+                        ))}
+                      {eventTeams.filter((t) => t.name.toLowerCase().includes(teamSearchQuery.toLowerCase())).length === 0 && (
+                        <div style={{ padding: '8px 12px', fontSize: 13, color: '#94a3b8' }}>Команд не найдено</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {hackathonMode && (
+                  <>
+                    <div className={styles.teacherField} style={{ marginTop: 12 }}>
+                      <div className={styles.teacherLabel}>Мотивация</div>
+                      <textarea
+                        className={styles.teacherTextarea}
+                        placeholder="Расскажите, почему хотите участвовать"
+                        value={applyMotivation}
+                        onChange={(e) => setApplyMotivation(e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+                    <div className={styles.teacherField} style={{ marginTop: 12 }}>
+                      <div className={styles.teacherLabel}>Навыки</div>
+                      <input
+                        className={styles.teacherInput}
+                        placeholder="Например: Python, ML, React"
+                        value={applySkills}
+                        onChange={(e) => setApplySkills(e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            {/* === Консультация / Другое / default === */}
+            {applyModalEvent.eventType !== 'Конференция' && applyModalEvent.eventType !== 'Акселератор' && applyModalEvent.eventType !== 'Карьера' && applyModalEvent.eventType !== 'Хакатон' && (
+              <>
+                <div className={styles.teacherField} style={{ marginTop: 16 }}>
+                  <div className={styles.teacherLabel}>Мотивация *</div>
+                  <textarea
+                    className={styles.teacherTextarea}
+                    placeholder="Расскажите, почему хотите участвовать"
+                    value={applyMotivation}
+                    onChange={(e) => setApplyMotivation(e.target.value)}
+                    rows={4}
+                  />
+                </div>
+                <div className={styles.teacherField} style={{ marginTop: 12 }}>
+                  <div className={styles.teacherLabel}>Навыки</div>
+                  <input
+                    className={styles.teacherInput}
+                    placeholder="Например: Python, ML, React"
+                    value={applySkills}
+                    onChange={(e) => setApplySkills(e.target.value)}
+                  />
+                </div>
+                <div className={styles.teacherField} style={{ marginTop: 12 }}>
+                  <div className={styles.teacherLabel}>Опыт участия</div>
+                  <textarea
+                    className={styles.teacherTextarea}
+                    placeholder="Расскажите о вашем опыте в похожих мероприятиях"
+                    value={applyExperience}
+                    onChange={(e) => setApplyExperience(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+                <div className={styles.teacherField} style={{ marginTop: 12 }}>
+                  <div className={styles.teacherLabel}>Контактный Telegram</div>
+                  <input
+                    className={styles.teacherInput}
+                    placeholder="@username"
+                    value={applyTelegram}
+                    onChange={(e) => setApplyTelegram(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
             {applyError && <p style={{ color: '#e53935', fontSize: 13, marginTop: 8 }}>{applyError}</p>}
             <div className={styles.teacherCreateActions} style={{ marginTop: 20 }}>
               <button className={styles.teacherCancelBtn} onClick={closeApplyModal}>Отмена</button>
               <button
                 className={styles.teacherSubmitBtn}
                 onClick={submitApply}
-                disabled={applyLoading || !applyMotivation.trim()}
+                disabled={applyLoading}
               >
-                {applyLoading ? 'Отправка...' : 'Подать заявку'}
+                {applyLoading ? 'Отправка...' : 'Зарегистрироваться'}
               </button>
             </div>
           </div>

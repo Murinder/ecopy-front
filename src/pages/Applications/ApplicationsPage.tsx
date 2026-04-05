@@ -13,42 +13,50 @@ import ChatIcon from '../../assets/icons/ui-chat.svg';
 import { useAppSelector } from '../../app/hooks';
 import {
   useGetLecturerApplicationsQuery,
+  useGetAdminApplicationsQuery,
   useUpdateApplicationStatusMutation,
 } from '../../services/coreApi';
+import type { ApplicationViewDto, ApplicationStatusType } from '../../services/coreApi';
 
-type RequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
-type RequestPriority = 'HIGH' | 'MEDIUM' | 'LOW';
-type RequestKind = 'PROJECT' | 'CONSULT' | 'VKR';
+type TabKey = 'active' | 'completed' | 'all';
 
-type StudentInfo = {
-  name: string;
-  email: string;
-  phone: string;
-  group: string;
-  course: string;
-  initials: string;
+const KIND_LABELS: Record<string, string> = {
+  PROJECT: 'Проект', CONSULT: 'Консультация', VKR: 'ВКР',
+  RESOURCE_REQUEST: 'Запрос ресурсов', EQUIPMENT_REQUEST: 'Запрос техники',
+  ROOM_REQUEST: 'Запрос кабинета', OTHER: 'Другое',
+};
+const kindLabel = (k: string, category?: string | null): string => {
+  if (k === 'OTHER' && category) return category;
+  return KIND_LABELS[k] ?? k;
+};
+const statusLabel = (s: string): string => {
+  const map: Record<string, string> = {
+    PENDING: 'На рассмотрении', APPROVED: 'Одобрено', REJECTED: 'Отклонено',
+    REVISION: 'На доработке', ADMIN_REVIEW: 'Подтверждение зав. каф.',
+    IN_PROGRESS: 'В процессе исполнения', COMPLETED: 'Исполнена', WITHDRAWN: 'Отозвано',
+  };
+  return map[s] ?? s;
 };
 
-type RequestItem = {
-  id: string;
-  title: string;
-  description: string;
-  submittedAt: string;
-  status: RequestStatus;
-  priority: RequestPriority;
-  kind: RequestKind;
-  student: StudentInfo;
-  category: string;
-  duration: string;
-  teamSize: string;
-  teacherReply?: string;
+const ACTIVE_STATUSES: ApplicationStatusType[] = ['PENDING', 'REVISION', 'ADMIN_REVIEW', 'IN_PROGRESS'];
+
+const kindPillClass = (k: string) => {
+  if (k === 'PROJECT') return styles.pillBlue;
+  if (k === 'CONSULT') return styles.pillGreen;
+  if (k === 'VKR') return styles.pillPurple;
+  return styles.pillBlue;
 };
 
-type TabKey = 'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL';
-
-const priorityLabel = (p: RequestPriority) => (p === 'HIGH' ? 'Высокий' : p === 'MEDIUM' ? 'Средний' : 'Низкий');
-const kindLabel = (k: RequestKind) => (k === 'PROJECT' ? 'Проект' : k === 'CONSULT' ? 'Консультация' : 'ВКР');
-const statusLabel = (s: RequestStatus) => (s === 'PENDING' ? 'На рассмотрении' : s === 'APPROVED' ? 'Одобрено' : 'Отклонено');
+const statusPillClass = (s: string) => {
+  if (s === 'PENDING') return styles.pillStatusPending;
+  if (s === 'APPROVED' || s === 'COMPLETED') return styles.pillStatusApproved;
+  if (s === 'REJECTED') return styles.pillStatusRejected;
+  if (s === 'REVISION') return styles.pillPurple;
+  if (s === 'ADMIN_REVIEW') return styles.pillBlue;
+  if (s === 'IN_PROGRESS') return styles.pillBlue;
+  if (s === 'WITHDRAWN') return styles.pillLow;
+  return styles.pillStatusPending;
+};
 
 
 const ApplicationsPage = () => {
@@ -56,101 +64,84 @@ const ApplicationsPage = () => {
   const userRole = useAppSelector((s) => s.auth.userRole) || 'Студент';
   const userId = useAppSelector((s) => s.auth.userId);
   const initials = useMemo(() => userName.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || 'ИИ', [userName]);
-  const isTeacher = userRole === 'Преподаватель' || userRole === 'Заведующий кафедрой';
+  const isTeacher = userRole === 'Преподаватель';
+  const isHead = userRole === 'Заведующий кафедрой';
+  const hasAccess = isTeacher || isHead;
 
-  const { data: apiApplications, isLoading: appsLoading, isError: appsError } = useGetLecturerApplicationsQuery(userId ?? '', { skip: !userId || !isTeacher });
+  // Fetch data based on role
+  const { data: lecturerApps, isLoading: lecturerLoading, isError: lecturerError } = useGetLecturerApplicationsQuery(userId ?? '', { skip: !userId || !isTeacher });
+  const { data: adminApps, isLoading: adminLoading, isError: adminError } = useGetAdminApplicationsQuery(undefined, { skip: !isHead });
+
   const [updateStatusMutation] = useUpdateApplicationStatusMutation();
+  // addApplicationComment used via updateStatus with comment field
 
-  const [tab, setTab] = useState<TabKey>('PENDING');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [tab, setTab] = useState<TabKey>('active');
+  const [selectedApp, setSelectedApp] = useState<ApplicationViewDto | null>(null);
   const [replyDraft, setReplyDraft] = useState('');
+  const [commentRequired, setCommentRequired] = useState(false);
 
-  const [items, setItems] = useState<RequestItem[]>([]);
+  const appsLoading = isTeacher ? lecturerLoading : adminLoading;
+  const appsError = isTeacher ? lecturerError : adminError;
+  const rawApps: ApplicationViewDto[] = isTeacher
+    ? (lecturerApps?.data ?? [])
+    : (adminApps?.data ?? []);
 
-  useEffect(() => {
-    if (apiApplications?.success && apiApplications.data.length > 0) {
-      setItems(apiApplications.data.map((a) => ({
-        id: a.id,
-        title: a.title,
-        description: a.description,
-        submittedAt: a.submittedAt,
-        status: a.status,
-        priority: a.priority,
-        kind: a.kind,
-        student: a.student,
-        category: a.category,
-        duration: a.duration,
-        teamSize: a.teamSize,
-        teacherReply: a.teacherReply,
-      })));
-    }
-  }, [apiApplications]);
-
-  const counts = useMemo(() => {
-    const c = { pending: 0, approved: 0, rejected: 0, total: items.length };
-    items.forEach((r) => {
-      if (r.status === 'PENDING') c.pending += 1;
-      else if (r.status === 'APPROVED') c.approved += 1;
-      else c.rejected += 1;
-    });
-    return c;
-  }, [items]);
+  const items = rawApps;
+  const activeCount = items.filter(r => ACTIVE_STATUSES.includes(r.status)).length;
+  const completedCount = items.length - activeCount;
 
   const list = useMemo(() => {
-    if (tab === 'ALL') return items;
-    if (tab === 'PENDING') return items.filter((r) => r.status === 'PENDING');
-    if (tab === 'APPROVED') return items.filter((r) => r.status === 'APPROVED');
-    return items.filter((r) => r.status === 'REJECTED');
+    if (tab === 'all') return items;
+    if (tab === 'active') return items.filter(r => ACTIVE_STATUSES.includes(r.status));
+    return items.filter(r => !ACTIVE_STATUSES.includes(r.status));
   }, [items, tab]);
 
-  const selected = useMemo(() => items.find((r) => r.id === selectedId) || null, [items, selectedId]);
-
   const closeModal = () => {
-    setSelectedId(null);
+    setSelectedApp(null);
     setReplyDraft('');
+    setCommentRequired(false);
   };
 
-  const openModal = (id: string) => {
-    setSelectedId(id);
-    const it = items.find((r) => r.id === id);
-    setReplyDraft(it?.teacherReply || '');
+  const openModal = (app: ApplicationViewDto) => {
+    setSelectedApp(app);
+    setReplyDraft('');
+    setCommentRequired(false);
   };
 
-  const updateStatus = (id: string, status: RequestStatus, reply?: string) => {
-    setItems((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status, teacherReply: typeof reply === 'string' ? reply : r.teacherReply } : r))
-    );
-  };
-
-  const approve = (id: string) => {
-    updateStatus(id, 'APPROVED', replyDraft.trim() || undefined);
-    updateStatusMutation({ applicationId: id, status: 'APPROVED', teacherReply: replyDraft.trim() || undefined });
-  };
-  const reject = (id: string) => {
-    updateStatus(id, 'REJECTED', replyDraft.trim() || undefined);
-    updateStatusMutation({ applicationId: id, status: 'REJECTED', teacherReply: replyDraft.trim() || undefined });
-  };
-  const clarify = () => {
-    window.alert('Запрос уточнений отправлен (демо)');
+  const handleUpdateStatus = async (status: string) => {
+    if (!selectedApp) return;
+    // Require comment for REVISION and REJECTED
+    if ((status === 'REVISION' || status === 'REJECTED') && !replyDraft.trim()) {
+      setCommentRequired(true);
+      return;
+    }
+    try {
+      await updateStatusMutation({
+        applicationId: selectedApp.id,
+        status,
+        teacherReply: replyDraft.trim() || undefined,
+      }).unwrap();
+      closeModal();
+    } catch { /* ignore */ }
   };
 
   useEffect(() => {
-    if (!selectedId) return;
+    if (!selectedApp) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeModal();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selectedId]);
+  }, [selectedApp]);
 
-  if (!isTeacher) {
+  if (!hasAccess) {
     return (
       <div className={styles.page}>
         <Sidebar />
         <div className={styles.content}>
           <div className={styles.topbar}>
             <div className={styles.titleWrap}>
-              <div className={styles.title}>Заявки студентов</div>
+              <div className={styles.title}>Заявки</div>
               <div className={styles.subtitle}>Раздел доступен только преподавателям</div>
             </div>
             <div className={styles.topActions}>
@@ -168,6 +159,11 @@ const ApplicationsPage = () => {
     );
   }
 
+  const pageTitle = isHead ? 'Заявки на ресурсы' : 'Заявки студентов';
+  const pageSubtitle = isHead
+    ? 'Заявки, ожидающие подтверждения или в процессе исполнения'
+    : 'Управление заявками от студентов';
+
   return (
     <div className={styles.page}>
       <Sidebar />
@@ -175,8 +171,8 @@ const ApplicationsPage = () => {
       <div className={styles.content}>
         <div className={styles.topbar}>
           <div className={styles.titleWrap}>
-            <div className={styles.title}>Заявки студентов</div>
-            <div className={styles.subtitle}>Добро пожаловать в вашу образовательную среду</div>
+            <div className={styles.title}>{pageTitle}</div>
+            <div className={styles.subtitle}>{pageSubtitle}</div>
           </div>
           <div className={styles.topActions}>
             <div className={styles.notif}>
@@ -190,8 +186,8 @@ const ApplicationsPage = () => {
           <div className={styles.stats}>
             <div className={styles.statCard}>
               <div>
-                <div className={styles.statLabel}>На рассмотрении</div>
-                <div className={styles.statValue}>{counts.pending}</div>
+                <div className={styles.statLabel}>Активные</div>
+                <div className={styles.statValue}>{activeCount}</div>
               </div>
               <div className={`${styles.statIconWrap} ${styles.statIconWrapYellow}`}>
                 <img src={BoltIcon} className={styles.statIcon} />
@@ -199,8 +195,8 @@ const ApplicationsPage = () => {
             </div>
             <div className={styles.statCard}>
               <div>
-                <div className={styles.statLabel}>Одобрено</div>
-                <div className={styles.statValue}>{counts.approved}</div>
+                <div className={styles.statLabel}>Завершённые</div>
+                <div className={styles.statValue}>{completedCount}</div>
               </div>
               <div className={`${styles.statIconWrap} ${styles.statIconWrapGreen}`}>
                 <img src={AwardIcon} className={styles.statIcon} />
@@ -208,17 +204,8 @@ const ApplicationsPage = () => {
             </div>
             <div className={styles.statCard}>
               <div>
-                <div className={styles.statLabel}>Отклонено</div>
-                <div className={styles.statValue}>{counts.rejected}</div>
-              </div>
-              <div className={`${styles.statIconWrap} ${styles.statIconWrapRed}`}>
-                <img src={CloseIcon} className={styles.statIcon} />
-              </div>
-            </div>
-            <div className={styles.statCard}>
-              <div>
-                <div className={styles.statLabel}>Всего заявок</div>
-                <div className={styles.statValue}>{counts.total}</div>
+                <div className={styles.statLabel}>Всего</div>
+                <div className={styles.statValue}>{items.length}</div>
               </div>
               <div className={`${styles.statIconWrap} ${styles.statIconWrapBlue}`}>
                 <img src={FileIcon} className={styles.statIcon} />
@@ -227,33 +214,14 @@ const ApplicationsPage = () => {
           </div>
 
           <div className={styles.tabs}>
-            <button
-              type="button"
-              className={tab === 'PENDING' ? styles.tabActive : styles.tab}
-              onClick={() => setTab('PENDING')}
-            >
-              На рассмотрении ({counts.pending})
+            <button type="button" className={tab === 'active' ? styles.tabActive : styles.tab} onClick={() => setTab('active')}>
+              Активные ({activeCount})
             </button>
-            <button
-              type="button"
-              className={tab === 'APPROVED' ? styles.tabActive : styles.tab}
-              onClick={() => setTab('APPROVED')}
-            >
-              Одобренные ({counts.approved})
+            <button type="button" className={tab === 'completed' ? styles.tabActive : styles.tab} onClick={() => setTab('completed')}>
+              Завершённые ({completedCount})
             </button>
-            <button
-              type="button"
-              className={tab === 'REJECTED' ? styles.tabActive : styles.tab}
-              onClick={() => setTab('REJECTED')}
-            >
-              Отклоненные ({counts.rejected})
-            </button>
-            <button
-              type="button"
-              className={tab === 'ALL' ? styles.tabActive : styles.tab}
-              onClick={() => setTab('ALL')}
-            >
-              Все ({counts.total})
+            <button type="button" className={tab === 'all' ? styles.tabActive : styles.tab} onClick={() => setTab('all')}>
+              Все ({items.length})
             </button>
           </div>
 
@@ -261,21 +229,18 @@ const ApplicationsPage = () => {
           {appsError && <p className={styles.error}>Ошибка загрузки данных</p>}
           <div className={styles.list}>
             {!appsLoading && !appsError && list.length === 0 && (
-              <p className={styles.empty}>Нет данных</p>
+              <p className={styles.empty}>Нет заявок</p>
             )}
             {list.map((r) => (
-              <div key={r.id} className={styles.row} onClick={() => openModal(r.id)} role="button" tabIndex={0} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && openModal(r.id)}>
+              <div key={r.id} className={styles.row} onClick={() => openModal(r)} role="button" tabIndex={0} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && openModal(r)}>
                 <div className={styles.avatarBig}>{r.student.initials}</div>
 
                 <div className={styles.rowMain}>
                   <div className={styles.rowHeader}>
-                    <div className={styles.rowTitle}>{r.title}</div>
+                    <div className={styles.rowTitle}>{r.title || `Заявка №${r.applicationNumber ?? '—'}`}</div>
                     <div className={styles.pills}>
-                      <span className={`${styles.pill} ${r.priority === 'HIGH' ? styles.pillHigh : r.priority === 'MEDIUM' ? styles.pillMedium : styles.pillLow}`}>
-                        {priorityLabel(r.priority)}
-                      </span>
-                      <span className={`${styles.pill} ${r.kind === 'PROJECT' ? styles.pillBlue : r.kind === 'CONSULT' ? styles.pillGreen : styles.pillPurple}`}>
-                        {kindLabel(r.kind)}
+                      <span className={`${styles.pill} ${kindPillClass(r.kind)}`}>
+                        {kindLabel(r.kind, r.category)}
                       </span>
                     </div>
                   </div>
@@ -287,24 +252,9 @@ const ApplicationsPage = () => {
                     <div className={styles.submitted}>
                       <span className={styles.submittedLabel}>Подано:</span> {r.submittedAt}
                     </div>
-                    <div className={styles.actions} onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        className={styles.approveBtn}
-                        onClick={() => approve(r.id)}
-                        disabled={r.status === 'APPROVED'}
-                      >
-                        ✓ Одобрить
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.rejectBtn}
-                        onClick={() => reject(r.id)}
-                        disabled={r.status === 'REJECTED'}
-                      >
-                        ✕ Отклонить
-                      </button>
-                    </div>
+                    <span className={`${styles.pill} ${statusPillClass(r.status)}`} style={{ fontSize: 11 }}>
+                      {statusLabel(r.status)}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -313,7 +263,8 @@ const ApplicationsPage = () => {
         </div>
       </div>
 
-      {selected && (
+      {/* Detail Modal */}
+      {selectedApp && (
         <div className={styles.modalOverlay} onClick={closeModal}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <button className={styles.modalClose} type="button" onClick={closeModal} aria-label="Закрыть">
@@ -321,93 +272,118 @@ const ApplicationsPage = () => {
             </button>
 
             <div className={styles.modalPills}>
-              <span className={`${styles.pill} ${selected.kind === 'PROJECT' ? styles.pillBlue : selected.kind === 'CONSULT' ? styles.pillGreen : styles.pillPurple}`}>
-                {kindLabel(selected.kind)}
+              <span className={`${styles.pill} ${kindPillClass(selectedApp.kind)}`}>
+                {kindLabel(selectedApp.kind, selectedApp.category)}
               </span>
-              <span className={`${styles.pill} ${selected.status === 'PENDING' ? styles.pillStatusPending : selected.status === 'APPROVED' ? styles.pillStatusApproved : styles.pillStatusRejected}`}>
-                {statusLabel(selected.status)}
-              </span>
-              <span className={`${styles.pill} ${selected.priority === 'HIGH' ? styles.pillHigh : selected.priority === 'MEDIUM' ? styles.pillMedium : styles.pillLow}`}>
-                {priorityLabel(selected.priority)}
+              <span className={`${styles.pill} ${statusPillClass(selectedApp.status)}`}>
+                {statusLabel(selectedApp.status)}
               </span>
             </div>
 
-            <div className={styles.modalTitle}>{selected.title}</div>
+            <div className={styles.modalTitle}>{selectedApp.title || `Заявка №${selectedApp.applicationNumber ?? '—'}`}</div>
 
             <div className={styles.block}>
               <div className={styles.blockTitle}>Информация о студенте</div>
               <div className={styles.studentRow}>
-                <div className={styles.studentAvatar}>{selected.student.initials}</div>
+                <div className={styles.studentAvatar}>{selectedApp.student.initials}</div>
                 <div className={styles.studentInfo}>
-                  <div className={styles.studentName}>{selected.student.name}</div>
+                  <div className={styles.studentName}>{selectedApp.student.name}</div>
                   <div className={styles.studentLine}>
                     <img src={MailIcon} className={styles.studentIcon} />
-                    {selected.student.email}
+                    {selectedApp.student.email}
                   </div>
                   <div className={styles.studentLine}>
                     <img src={PhoneIcon} className={styles.studentIcon} />
-                    {selected.student.phone}
+                    {selectedApp.student.phone || '—'}
                   </div>
                   <div className={styles.studentSmall}>
-                    {selected.student.group} • {selected.student.course}
+                    {selectedApp.student.group} • {selectedApp.student.course}
                   </div>
                 </div>
               </div>
             </div>
 
             <div className={styles.sectionTitle}>Описание заявки</div>
-            <div className={styles.modalDesc}>{selected.description}</div>
+            <div className={styles.modalDesc}>{selectedApp.description || '—'}</div>
 
-            <div className={styles.sectionTitle}>Детали проекта</div>
-            <div className={styles.detailsGrid}>
-              <div className={styles.detailCard}>
-                <div className={styles.detailLabel}>Категория</div>
-                <div className={styles.detailValue}>{selected.category}</div>
-              </div>
-              <div className={styles.detailCard}>
-                <div className={styles.detailLabel}>Длительность</div>
-                <div className={styles.detailValue}>{selected.duration}</div>
-              </div>
-              <div className={styles.detailCard}>
-                <div className={styles.detailLabel}>Размер команды</div>
-                <div className={styles.detailValue}>{selected.teamSize}</div>
-              </div>
-            </div>
+            {/* Project details only for PROJECT/CONSULT/VKR */}
+            {['PROJECT', 'CONSULT', 'VKR'].includes(selectedApp.kind) && (selectedApp.category || selectedApp.duration || selectedApp.teamSize) && (
+              <>
+                <div className={styles.sectionTitle}>Детали проекта</div>
+                <div className={styles.detailsGrid}>
+                  {selectedApp.category && <div className={styles.detailCard}><div className={styles.detailLabel}>Категория</div><div className={styles.detailValue}>{selectedApp.category}</div></div>}
+                  {selectedApp.duration && <div className={styles.detailCard}><div className={styles.detailLabel}>Длительность</div><div className={styles.detailValue}>{selectedApp.duration}</div></div>}
+                  {selectedApp.teamSize && <div className={styles.detailCard}><div className={styles.detailLabel}>Размер команды</div><div className={styles.detailValue}>{selectedApp.teamSize}</div></div>}
+                </div>
+              </>
+            )}
 
-            <div className={styles.sectionTitle}>Ответ студенту</div>
+            {/* Comments section */}
+            {(selectedApp.comments ?? []).length > 0 && (
+              <>
+                <div className={styles.sectionTitle}>Комментарии</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                  {(selectedApp.comments ?? []).map(c => (
+                    <div key={c.id} style={{ background: '#f9fafb', borderRadius: 8, padding: '10px 12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontWeight: 600, fontSize: 13, color: '#0e1d45' }}>{c.authorName} <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: 11 }}>({c.authorRole === 'STUDENT' ? 'Студент' : c.authorRole === 'LECTURER' ? 'Преподаватель' : 'Зав. кафедрой'})</span></span>
+                        <span style={{ fontSize: 11, color: '#94a3b8' }}>{c.createdAt}</span>
+                      </div>
+                      <div style={{ fontSize: 14, color: '#475569' }}>{c.content}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Reply / comment field */}
+            <div className={styles.sectionTitle}>{isHead ? 'Комментарий' : 'Ответ студенту'}</div>
             <textarea
               className={styles.reply}
-              placeholder="Добавьте комментарий или рекомендации..."
+              placeholder={isHead ? 'Комментарий при отклонении (обязательно)...' : 'Комментарий к заявке...'}
               value={replyDraft}
-              onChange={(e) => setReplyDraft(e.target.value)}
+              onChange={(e) => { setReplyDraft(e.target.value); setCommentRequired(false); }}
             />
+            {commentRequired && <div style={{ color: '#ef4444', fontSize: 13, marginTop: 4, marginBottom: 8 }}>Необходимо написать комментарий</div>}
 
-            <div className={styles.modalActions}>
-              <button
-                type="button"
-                className={styles.modalApprove}
-                onClick={() => {
-                  approve(selected.id);
-                  closeModal();
-                }}
-              >
-                ✓ Одобрить заявку
-              </button>
-              <button
-                type="button"
-                className={styles.modalReject}
-                onClick={() => {
-                  reject(selected.id);
-                  closeModal();
-                }}
-              >
-                ✕ Отклонить
-              </button>
-              <button type="button" className={styles.modalClarify} onClick={clarify}>
-                <img src={ChatIcon} className={styles.modalClarifyIcon} />
-                Запросить уточнения
-              </button>
-            </div>
+            {/* Action buttons — teacher */}
+            {isTeacher && ACTIVE_STATUSES.includes(selectedApp.status) && selectedApp.status !== 'ADMIN_REVIEW' && selectedApp.status !== 'IN_PROGRESS' && (
+              <div className={styles.modalActions}>
+                <button type="button" className={styles.modalApprove} onClick={() => handleUpdateStatus('APPROVED')}>
+                  ✓ Одобрить
+                </button>
+                <button type="button" className={styles.modalReject} onClick={() => handleUpdateStatus('REJECTED')}>
+                  ✕ Отклонить
+                </button>
+                {selectedApp.status === 'PENDING' && (
+                  <button type="button" className={styles.modalClarify} onClick={() => handleUpdateStatus('REVISION')}>
+                    <img src={ChatIcon} className={styles.modalClarifyIcon} />
+                    На доработке
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Action buttons — department head */}
+            {isHead && (
+              <div className={styles.modalActions}>
+                {selectedApp.status === 'ADMIN_REVIEW' && (
+                  <button type="button" className={styles.modalApprove} onClick={() => handleUpdateStatus('IN_PROGRESS')}>
+                    ✓ Принять
+                  </button>
+                )}
+                {selectedApp.status === 'IN_PROGRESS' && (
+                  <button type="button" className={styles.modalApprove} onClick={() => handleUpdateStatus('COMPLETED')}>
+                    ✓ Исполнено
+                  </button>
+                )}
+                {(selectedApp.status === 'ADMIN_REVIEW' || selectedApp.status === 'IN_PROGRESS') && (
+                  <button type="button" className={styles.modalReject} onClick={() => handleUpdateStatus('REJECTED')}>
+                    ✕ Отклонить
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -416,4 +392,3 @@ const ApplicationsPage = () => {
 };
 
 export default ApplicationsPage;
-
