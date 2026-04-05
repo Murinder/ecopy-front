@@ -79,28 +79,12 @@ const AuthPage = () => {
     dispatch(setUserRole(backendRoleToUiRole[jwt.role] || jwt.role || 'Студент'));
   };
 
-  const loginAsDemoUser = async (key: DemoUserKey) => {
+  const fillDemoUser = (key: DemoUserKey) => {
     const u = demoUsers[key];
     setTab('login');
     setEmail(u.email);
     setPassword(u.password);
     setErrorText(undefined);
-    try {
-      const res = await login({ email: u.email, password: u.password }).unwrap();
-      applyLoginToken(res.data);
-      const jwt = decodeJwt(res.data.accessToken);
-      try {
-        const profile = await fetchProfile(jwt.userId).unwrap();
-        const fullName = [profile.data.firstName, profile.data.lastName].filter(Boolean).join(' ');
-        dispatch(setUserName(fullName || jwt.email.split('@')[0]));
-      } catch {
-        dispatch(setUserName(jwt.email.split('@')[0]));
-      }
-      dispatch(setRememberMe(remember));
-      navigate('/projects');
-    } catch {
-      setErrorText('Не удалось войти. Проверьте доступность сервера.');
-    }
   };
 
   const onSubmit = async () => {
@@ -224,21 +208,21 @@ const AuthPage = () => {
                     <button
                       type="button"
                       className={styles.testUserBtn}
-                      onClick={() => loginAsDemoUser('student')}
+                      onClick={() => fillDemoUser('student')}
                     >
                       {demoUsers.student.label}
                     </button>
                     <button
                       type="button"
                       className={styles.testUserBtn}
-                      onClick={() => loginAsDemoUser('teacher')}
+                      onClick={() => fillDemoUser('teacher')}
                     >
                       {demoUsers.teacher.label}
                     </button>
                     <button
                       type="button"
                       className={styles.testUserBtn}
-                      onClick={() => loginAsDemoUser('head')}
+                      onClick={() => fillDemoUser('head')}
                     >
                       {demoUsers.head.label}
                     </button>

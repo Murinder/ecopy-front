@@ -1320,7 +1320,7 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                           {app.participantRole === 'TEAM_CREATOR' ? 'Создатель команды' : 'Участник команды'}
                         </div>
                       )}
-                      {statusKey === 'SUBMITTED' && (
+                      {(statusKey === 'SUBMITTED' || statusKey === 'PENDING_TEAM_APPROVAL') && (
                         <div className={styles.modalActions} style={{ marginTop: 12 }}>
                           <button
                             className={`${styles.actionBtn} ${styles.dangerBtn}`}
@@ -1477,6 +1477,13 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                                 </button>
                               )}
                             </>
+                          );
+                        }
+                        if (selected.tag === 'Хакатон' && myTeam?.createdBy === userId) {
+                          return (
+                            <div className={`${styles.pill} ${styles.statusPending}`}>
+                              Ваша команда создана
+                            </div>
                           );
                         }
                         return (
