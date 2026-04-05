@@ -417,6 +417,17 @@ export const coreApi = createApi({
       }),
       providesTags: ['Students'],
     }),
+    getGroups: builder.query<ApiResponse<string[]>, void>({
+      query: () => ({
+        url: '/api/v1/users/students/groups',
+      }),
+    }),
+    searchUsers: builder.query<ApiResponse<UserProfileDto[]>, string>({
+      query: (q) => ({
+        url: '/api/v1/users/students/search',
+        params: { q },
+      }),
+    }),
     getLecturerApplications: builder.query<ApiResponse<ApplicationViewDto[]>, string>({
       query: (lecturerId) => ({
         url: `/api/v1/applications/lecturer/${lecturerId}`,
@@ -553,6 +564,7 @@ export const {
   useGetTeachersQuery,
   useGetTeachersDetailedQuery,
   useGetStudentsQuery,
+  useGetGroupsQuery,
   useGetLecturerApplicationsQuery,
   useGetStudentApplicationsQuery,
   useUpdateApplicationStatusMutation,
@@ -577,4 +589,5 @@ export const {
   useGetUserDocumentsQuery,
   useUploadUserDocumentMutation,
   useDeleteUserDocumentMutation,
+  useLazySearchUsersQuery,
 } = coreApi;

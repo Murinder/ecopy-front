@@ -29,7 +29,7 @@ import {
   useGetDepartmentDashboardQuery,
 } from '../../services/projectApi';
 import type { TaskDto, ProjectDto, DocumentDto, ProjectWithTaskSummary } from '../../services/projectApi';
-import { useGetStudentsQuery, useGetTeachersQuery, useGetProfileQuery } from '../../services/coreApi';
+import { useGetTeachersQuery, useGetProfileQuery, useLazySearchUsersQuery } from '../../services/coreApi';
 
 const STATUS_RU: Record<string, string> = {
   ACTIVE: 'Активен', COMPLETED: 'Завершён', FROZEN: 'Заморожен', CANCELLED: 'Отменён',
@@ -182,13 +182,13 @@ const ProjectsPage = () => {
   const studentMembers = studentMembersResp?.data || [];
   const [addMember] = useAddProjectMemberMutation();
   const [removeMember] = useRemoveProjectMemberMutation();
-  const [addMemberEmail, setAddMemberEmail] = useState('');
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [addMemberError, setAddMemberError] = useState<string | null>(null);
-  const [foundUser, setFoundUser] = useState<{ id: string; email: string; name: string } | null>(null);
+  const [foundUser, setFoundUser] = useState<{ id: string; name: string; groupName?: string } | null>(null);
   const [selectedRole, setSelectedRole] = useState<string>('MEMBER');
-  const { data: allStudents } = useGetStudentsQuery();
+  const [triggerSearch, { data: searchResults, isFetching: isSearching }] = useLazySearchUsersQuery();
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { data: allTeachers } = useGetTeachersQuery();
-  const allUsersForLookup = useMemo(() => [...(allStudents?.data ?? []), ...(allTeachers?.data ?? [])], [allStudents, allTeachers]);
 
   const { data: tasksResp, isLoading: tasksLoading, isError: tasksError } = useGetProjectTasksQuery(
     selectedProjectId || '',
@@ -804,33 +804,55 @@ const ProjectsPage = () => {
                               })()}
                             </div>
                             {!foundUser ? (
-                              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                              <div style={{ position: 'relative' }}>
                                 <input
-                                  style={{ flex: 1, padding: '8px 12px', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: 13 }}
-                                  placeholder="Email участника"
-                                  value={addMemberEmail}
-                                  onChange={(e) => { setAddMemberEmail(e.target.value); setAddMemberError(null); }}
-                                />
-                                <button
-                                  style={{ padding: '8px 14px', background: '#3B82F6', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}
-                                  onClick={() => {
-                                    if (!addMemberEmail.trim() || !selectedProjectId) return;
+                                  style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #E2E8F0', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }}
+                                  placeholder="Поиск по ФИО"
+                                  value={memberSearchQuery}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setMemberSearchQuery(val);
                                     setAddMemberError(null);
-                                    const found = allUsersForLookup.find(u => u.email === addMemberEmail.trim());
-                                    if (!found) { setAddMemberError('Пользователь не найден'); return; }
-                                    if (studentMembers.some(m => m.userId === found.id)) { setAddMemberError('Уже участник'); return; }
-                                    const name = [found.firstName, found.lastName].filter(Boolean).join(' ') || found.email;
-                                    setFoundUser({ id: found.id, email: found.email, name });
-                                    setSelectedRole('MEMBER');
-                                    setAddMemberError(null);
+                                    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+                                    if (val.trim().length >= 2) {
+                                      searchDebounceRef.current = setTimeout(() => triggerSearch(val.trim()), 300);
+                                    }
                                   }}
-                                >Найти</button>
+                                />
+                                {memberSearchQuery.trim().length >= 2 && (
+                                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, background: '#fff', border: '1.5px solid #E2E8F0', borderRadius: 8, marginTop: 4, maxHeight: 220, overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+                                    {isSearching ? (
+                                      <div style={{ padding: '10px 12px', fontSize: 13, color: '#64748b' }}>Поиск...</div>
+                                    ) : (() => {
+                                      const results = (searchResults?.data ?? []).filter(u => !studentMembers.some(m => m.userId === u.id));
+                                      if (results.length === 0) return <div style={{ padding: '10px 12px', fontSize: 13, color: '#64748b' }}>Никого не найдено</div>;
+                                      return results.map(u => (
+                                        <div
+                                          key={u.id}
+                                          style={{ padding: '8px 12px', fontSize: 13, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                                          onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.background = '#F1F5F9'; }}
+                                          onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
+                                          onClick={() => {
+                                            const name = [u.lastName, u.firstName].filter(Boolean).join(' ') || u.email;
+                                            setFoundUser({ id: u.id, name, groupName: u.groupName });
+                                            setMemberSearchQuery('');
+                                            setSelectedRole('MEMBER');
+                                            setAddMemberError(null);
+                                          }}
+                                        >
+                                          <span style={{ fontWeight: 500, color: '#1B2559' }}>{[u.lastName, u.firstName].filter(Boolean).join(' ') || u.email}</span>
+                                          <span style={{ color: '#64748b', fontSize: 12, marginLeft: 8, flexShrink: 0 }}>{u.groupName || '—'}</span>
+                                        </div>
+                                      ));
+                                    })()}
+                                  </div>
+                                )}
                               </div>
                             ) : (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                 <div style={{ padding: '8px 12px', background: '#EFF6FF', borderRadius: 8, fontSize: 13 }}>
                                   <span style={{ fontWeight: 600, color: '#1B2559' }}>{foundUser.name}</span>
-                                  <span style={{ color: '#64748b', marginLeft: 6 }}>{foundUser.email}</span>
+                                  <span style={{ color: '#64748b', marginLeft: 6 }}>{foundUser.groupName || '—'}</span>
                                 </div>
                                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                                   <select
@@ -851,8 +873,15 @@ const ProjectsPage = () => {
                                         refetchMembers();
                                         setFoundUser(null);
                                         setSelectedRole('MEMBER');
-                                        setAddMemberEmail('');
-                                      } catch { setAddMemberError('Ошибка при добавлении'); }
+                                        setMemberSearchQuery('');
+                                      } catch (err: any) {
+                                        const status = err?.status || err?.originalStatus;
+                                        if (status === 403) {
+                                          setAddMemberError('Добавлять участников может только руководитель проекта');
+                                        } else {
+                                          setAddMemberError(err?.data?.message || 'Ошибка при добавлении');
+                                        }
+                                      }
                                     }}
                                   >+ Добавить</button>
                                   <button
@@ -1463,8 +1492,15 @@ const KanbanColumn = ({
                   )}
                 </div>
               </div>
-              <div className={styles.badge3}>
-                <p className={styles.a32}>{STATUS_RU[t.status] || t.status}</p>
+              <div className={styles.taskCardFooter}>
+                <div className={styles.badge3}>
+                  <p className={styles.a32}>{STATUS_RU[t.status] || t.status}</p>
+                </div>
+                {t.assignedToName && (
+                  <span className={styles.taskAssignee} title={t.assignedToName}>
+                    {t.assignedToName}
+                  </span>
+                )}
               </div>
             </div>
           </div>

@@ -33,6 +33,7 @@ export interface TaskDto {
   description?: string;
   status: 'TO_DO' | 'IN_PROGRESS' | 'REVIEW' | 'DONE' | 'BLOCKED';
   assignedTo?: string;
+  assignedToName?: string;
   dueDate?: string;
 }
 

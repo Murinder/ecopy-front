@@ -98,6 +98,7 @@ export interface LessonDto {
   groupName?: string;
   room?: string;
   semester?: number;
+  lessonDate?: string;
 }
 
 export interface CreateLessonDto {
@@ -109,6 +110,7 @@ export interface CreateLessonDto {
   groupName?: string;
   room?: string;
   semester?: number;
+  lessonDate?: string;
 }
 
 export interface DefenseDto {
@@ -183,6 +185,14 @@ export const eventApi = createApi({
       query: (body) => ({
         url: '/api/v1/events/schedule/lessons',
         method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Lessons'],
+    }),
+    updateLesson: builder.mutation<ApiResponse<LessonDto>, { lessonId: string; body: CreateLessonDto }>({
+      query: ({ lessonId, body }) => ({
+        url: `/api/v1/events/schedule/lessons/${lessonId}`,
+        method: 'PUT',
         body,
       }),
       invalidatesTags: ['Lessons'],
@@ -262,6 +272,7 @@ export const {
   useCreateEventMutation,
   useGetLessonsQuery,
   useCreateLessonMutation,
+  useUpdateLessonMutation,
   useDeleteLessonMutation,
   useGetDefensesQuery,
   useCreateDefenseMutation,

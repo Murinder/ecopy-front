@@ -13,15 +13,17 @@ import { useAppSelector } from '../../app/hooks';
 import {
   useGetLessonsQuery,
   useCreateLessonMutation,
+  useUpdateLessonMutation,
+  useDeleteLessonMutation,
   useGetDefensesQuery,
   useCreateDefenseMutation,
   useUpdateDefenseStatusMutation,
 } from '../../services/eventApi';
 import type { LessonDto, DefenseDto as ApiDefenseDto } from '../../services/eventApi';
-import { useGetStudentsQuery } from '../../services/coreApi';
+import { useGetStudentsQuery, useGetGroupsQuery } from '../../services/coreApi';
 
 type WeekdayKey = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI';
-type LessonType = 'Лекция' | 'Семинар' | 'Практика';
+type LessonType = 'Лекция' | 'Семинар' | 'Практика' | 'Другое';
 
 type TimeSlot = {
   key: string;
@@ -36,6 +38,7 @@ type Lesson = {
   type: LessonType;
   group: string;
   room: string;
+  lessonDate?: string;
 };
 
 type DefenseType = 'ВКР' | 'Курсовая' | 'Научная работа';
@@ -97,11 +100,63 @@ const addMonth = (year: number, month0: number, delta: number) => {
   return { year: next.getFullYear(), month0: next.getMonth() };
 };
 
+type DateEntry = { date: Date; dateIso: string; weekday: WeekdayKey; label: string };
+
+const weekdayShort: Record<WeekdayKey, string> = { MON: 'Пн', TUE: 'Вт', WED: 'Ср', THU: 'Чт', FRI: 'Пт' };
+
+const dayIndexToWeekday: (WeekdayKey | null)[] = [null, 'MON', 'TUE', 'WED', 'THU', 'FRI', null];
+
+const getWeekStart = (ref: Date): Date => {
+  const d = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
+};
+
+const addWeeks = (date: Date, delta: number): Date => {
+  const d = new Date(date);
+  d.setDate(d.getDate() + delta * 7);
+  return d;
+};
+
+const generateWeekDates = (weekStart: Date, count: 1 | 2): DateEntry[] => {
+  const result: DateEntry[] = [];
+  const totalDays = count * 7;
+  for (let i = 0; i < totalDays; i++) {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + i);
+    const wd = dayIndexToWeekday[d.getDay()];
+    if (!wd) continue;
+    result.push({
+      date: d,
+      dateIso: dateIsoFromDate(d),
+      weekday: wd,
+      label: `${weekdayShort[wd]} ${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}`,
+    });
+  }
+  return result;
+};
+
+const ruGenitive = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+
+const formatWeekRange = (weekStart: Date, count: 1 | 2): string => {
+  const fri = new Date(weekStart);
+  fri.setDate(fri.getDate() + (count === 1 ? 4 : 11));
+  const d1 = weekStart.getDate();
+  const m1 = weekStart.getMonth();
+  const d2 = fri.getDate();
+  const m2 = fri.getMonth();
+  const y = fri.getFullYear();
+  if (m1 === m2) return `${d1} — ${d2} ${ruGenitive[m2]} ${y}`;
+  return `${d1} ${ruGenitive[m1]} — ${d2} ${ruGenitive[m2]} ${y}`;
+};
+
 const typePillClass = (t: LessonType) =>
-  t === 'Лекция' ? styles.pillBlue : t === 'Семинар' ? styles.pillGreen : styles.pillPurple;
+  t === 'Лекция' ? styles.pillBlue : t === 'Семинар' ? styles.pillGreen : t === 'Другое' ? styles.pillOrange : styles.pillPurple;
 
 const cellClass = (t: LessonType) =>
-  t === 'Лекция' ? styles.cellBlue : t === 'Семинар' ? styles.cellGreen : styles.cellPurple;
+  t === 'Лекция' ? styles.cellBlue : t === 'Семинар' ? styles.cellGreen : t === 'Другое' ? styles.cellOrange : styles.cellPurple;
 
 const ClockIconSvg = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -135,10 +190,10 @@ const weekdayToBackendDay: Record<WeekdayKey, string> = {
   MON: 'MONDAY', TUE: 'TUESDAY', WED: 'WEDNESDAY', THU: 'THURSDAY', FRI: 'FRIDAY',
 };
 const backendTypeToLabel: Record<string, LessonType> = {
-  LECTURE: 'Лекция', SEMINAR: 'Семинар', PRACTICE: 'Практика',
+  LECTURE: 'Лекция', SEMINAR: 'Семинар', PRACTICE: 'Практика', OTHER: 'Другое',
 };
 const labelToBackendType: Record<LessonType, string> = {
-  'Лекция': 'LECTURE', 'Семинар': 'SEMINAR', 'Практика': 'PRACTICE',
+  'Лекция': 'LECTURE', 'Семинар': 'SEMINAR', 'Практика': 'PRACTICE', 'Другое': 'OTHER',
 };
 
 const mapTimeToSlotKey = (time: string): string => {
@@ -164,11 +219,14 @@ const mapApiLessonToLocal = (dto: LessonDto): Lesson => ({
   type: backendTypeToLabel[dto.lessonType] || 'Лекция',
   group: dto.groupName || '',
   room: dto.room || '',
+  lessonDate: dto.lessonDate || undefined,
 });
 
 
 const TeacherScheduleView = ({ avatarInitials, userId }: { avatarInitials: string; userId: string }) => {
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
 
   const [dayDraft, setDayDraft] = useState<WeekdayKey>('MON');
   const [slotDraft, setSlotDraft] = useState<string>(timeSlots[1].key);
@@ -176,9 +234,34 @@ const TeacherScheduleView = ({ avatarInitials, userId }: { avatarInitials: strin
   const [typeDraft, setTypeDraft] = useState<LessonType>('Лекция');
   const [groupDraft, setGroupDraft] = useState('');
   const [roomDraft, setRoomDraft] = useState('');
+  const [noGroup, setNoGroup] = useState(false);
+  const [isOneTime, setIsOneTime] = useState(false);
+  const [dateDraft, setDateDraft] = useState('');
+  const [groupDropdownOpen, setGroupDropdownOpen] = useState(false);
+
+  const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
+  const [weekCount, setWeekCount] = useState<1 | 2>(1);
+
+  const displayDates = useMemo(() => generateWeekDates(weekStart, weekCount), [weekStart, weekCount]);
+  const weekLabel = useMemo(() => formatWeekRange(weekStart, weekCount), [weekStart, weekCount]);
+  const todayIso = useMemo(() => dateIsoFromDate(new Date()), []);
+
+  const goPrev = () => setWeekStart(w => addWeeks(w, -weekCount));
+  const goNext = () => setWeekStart(w => addWeeks(w, weekCount));
+  const goToday = () => setWeekStart(getWeekStart(new Date()));
 
   const { data: lessonsData, isLoading: lessonsLoading, isError: lessonsError } = useGetLessonsQuery({ userId }, { skip: !userId });
   const [createLessonApi] = useCreateLessonMutation();
+  const [updateLessonApi] = useUpdateLessonMutation();
+  const [deleteLessonApi] = useDeleteLessonMutation();
+  const { data: groupsData } = useGetGroupsQuery();
+
+  const allGroups = useMemo(() => groupsData?.data ?? [], [groupsData]);
+  const filteredGroups = useMemo(() => {
+    const q = groupDraft.trim().toLowerCase();
+    if (!q) return allGroups.slice(0, 7);
+    return allGroups.filter(g => g.toLowerCase().includes(q)).slice(0, 7);
+  }, [allGroups, groupDraft]);
 
   const lessons = useMemo<Lesson[]>(() => {
     const apiLessons = lessonsData?.data;
@@ -188,19 +271,29 @@ const TeacherScheduleView = ({ avatarInitials, userId }: { avatarInitials: strin
     return [];
   }, [lessonsData]);
 
-  const byCell = useMemo(() => {
+  const recurringLessons = useMemo(() => lessons.filter(l => !l.lessonDate), [lessons]);
+  const oneTimeLessons = useMemo(() => lessons.filter(l => !!l.lessonDate), [lessons]);
+
+  const byCellRecurring = useMemo(() => {
     const m = new Map<string, Lesson>();
-    for (const l of lessons) m.set(`${l.day}|${l.slotKey}`, l);
+    for (const l of recurringLessons) m.set(`${l.day}|${l.slotKey}`, l);
     return m;
-  }, [lessons]);
+  }, [recurringLessons]);
+
+  const getLessonForCell = (dateIso: string, weekday: WeekdayKey, slotKey: string): Lesson | undefined => {
+    const oneTime = oneTimeLessons.find(l => l.lessonDate === dateIso && l.slotKey === slotKey);
+    if (oneTime) return oneTime;
+    return byCellRecurring.get(`${weekday}|${slotKey}`);
+  };
 
   const stats = useMemo(() => {
     const lectures = lessons.filter((l) => l.type === 'Лекция').length;
     const seminars = lessons.filter((l) => l.type === 'Семинар').length;
     const practice = lessons.filter((l) => l.type === 'Практика').length;
-    const groups = new Set(lessons.map((l) => l.group)).size;
+    const other = lessons.filter((l) => l.type === 'Другое').length;
+    const groups = new Set(lessons.filter(l => l.group).map((l) => l.group)).size;
     const hours = lessons.length * 2;
-    return { hours, lectures, seminars, practice, groups };
+    return { hours, lectures, seminars, practice, other, groups };
   }, [lessons]);
 
   const bySubject = useMemo(() => {
@@ -223,8 +316,33 @@ const TeacherScheduleView = ({ avatarInitials, userId }: { avatarInitials: strin
     return [...m.entries()];
   }, [lessons]);
 
-  const openAdd = () => setIsAddOpen(true);
-  const closeAdd = () => setIsAddOpen(false);
+  const openAdd = () => { setAddError(''); setEditingLessonId(null); setIsAddOpen(true); };
+  const closeAdd = () => { setIsAddOpen(false); setEditingLessonId(null); };
+
+  const openEdit = (lesson: Lesson) => {
+    setEditingLessonId(lesson.id);
+    setDayDraft(lesson.day);
+    setSlotDraft(lesson.slotKey);
+    setSubjectDraft(lesson.subject);
+    setTypeDraft(lesson.type);
+    setGroupDraft(lesson.group);
+    setRoomDraft(lesson.room);
+    setNoGroup(!lesson.group);
+    setIsOneTime(!!lesson.lessonDate);
+    setDateDraft(lesson.lessonDate || '');
+    setGroupDropdownOpen(false);
+    setAddError('');
+    setIsAddOpen(true);
+  };
+
+  const handleDelete = async (lessonId: string) => {
+    if (!window.confirm('Удалить это занятие?')) return;
+    try {
+      await deleteLessonApi(lessonId).unwrap();
+    } catch (err) {
+      console.error('deleteLesson error:', err);
+    }
+  };
 
   const resetDraft = () => {
     setDayDraft('MON');
@@ -233,6 +351,11 @@ const TeacherScheduleView = ({ avatarInitials, userId }: { avatarInitials: strin
     setTypeDraft('Лекция');
     setGroupDraft('');
     setRoomDraft('');
+    setNoGroup(false);
+    setIsOneTime(false);
+    setDateDraft('');
+    setGroupDropdownOpen(false);
+    setEditingLessonId(null);
   };
 
   useEffect(() => {
@@ -246,31 +369,50 @@ const TeacherScheduleView = ({ avatarInitials, userId }: { avatarInitials: strin
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [isAddOpen]);
 
+  const [addError, setAddError] = useState('');
+
   const submitAdd = async () => {
     const subject = subjectDraft.trim();
     const group = groupDraft.trim();
     const room = roomDraft.trim();
-    if (!subject || !group || !room) {
-      window.alert('Заполните все поля');
+    if (!subject || !room) {
+      setAddError('Заполните все поля');
+      return;
+    }
+    if (!noGroup && !group) {
+      setAddError('Укажите группу или отметьте «Без группы»');
+      return;
+    }
+    if (isOneTime && !dateDraft) {
+      setAddError('Укажите дату занятия');
       return;
     }
 
+    setAddError('');
+    const payload = {
+      userId,
+      dayOfWeek: isOneTime ? 'MONDAY' : weekdayToBackendDay[dayDraft],
+      timeSlot: slotDraft.split('-')[0],
+      subject,
+      lessonType: labelToBackendType[typeDraft],
+      groupName: noGroup ? undefined : group,
+      room,
+      lessonDate: isOneTime ? dateDraft : undefined,
+    };
     try {
-      await createLessonApi({
-        userId,
-        dayOfWeek: weekdayToBackendDay[dayDraft],
-        timeSlot: slotDraft.split('-')[0],
-        subject,
-        lessonType: labelToBackendType[typeDraft],
-        groupName: group,
-        room,
-      }).unwrap();
-    } catch {
-      // Fallback: already using cached data
+      if (editingLessonId) {
+        await updateLessonApi({ lessonId: editingLessonId, body: payload }).unwrap();
+      } else {
+        await createLessonApi(payload).unwrap();
+      }
+      closeAdd();
+      resetDraft();
+    } catch (err: unknown) {
+      const msg = (err as { data?: { message?: string } })?.data?.message
+        || (editingLessonId ? 'Не удалось обновить занятие.' : 'Не удалось добавить занятие. Проверьте соединение с сервером.');
+      setAddError(msg);
+      console.error(editingLessonId ? 'updateLesson error:' : 'createLesson error:', err);
     }
-
-    closeAdd();
-    resetDraft();
   };
 
   return (
@@ -299,8 +441,12 @@ const TeacherScheduleView = ({ avatarInitials, userId }: { avatarInitials: strin
           {lessonsLoading && <p className={styles.loading}>Загрузка...</p>}
           {lessonsError && <p className={styles.error}>Ошибка загрузки данных</p>}
           <div className={styles.secondaryActions}>
-            <button type="button" className={styles.secondaryBtn} onClick={() => window.alert('Редактирование расписания (демо)')}>
-              Редактировать расписание
+            <button
+              type="button"
+              className={`${styles.secondaryBtn} ${editMode ? styles.secondaryBtnActive : ''}`}
+              onClick={() => setEditMode(prev => !prev)}
+            >
+              {editMode ? 'Завершить редактирование' : 'Редактировать расписание'}
             </button>
           </div>
 
@@ -322,6 +468,10 @@ const TeacherScheduleView = ({ avatarInitials, userId }: { avatarInitials: strin
               <div className={styles.statValue}>{stats.practice}</div>
             </div>
             <div className={styles.statCard}>
+              <div className={styles.statLabel}>Другое</div>
+              <div className={styles.statValue}>{stats.other}</div>
+            </div>
+            <div className={styles.statCard}>
               <div className={styles.statLabel}>Групп</div>
               <div className={styles.statValue}>{stats.groups}</div>
             </div>
@@ -330,32 +480,64 @@ const TeacherScheduleView = ({ avatarInitials, userId }: { avatarInitials: strin
           <div className={styles.card}>
             <div className={styles.cardHeader}>
               <div className={styles.cardTitle}>Расписание занятий</div>
-              <div className={styles.cardSubtitle}>Недельное расписание</div>
+              <div className={styles.cardSubtitle}>{weekLabel}</div>
+            </div>
+
+            <div className={styles.weekNav}>
+              <div className={styles.weekNavCenter}>
+                <button type="button" className={styles.weekNavBtn} onClick={goPrev} aria-label="Предыдущая неделя">&#8249;</button>
+                <div className={styles.weekNavLabel}>{weekLabel}</div>
+                <button type="button" className={styles.weekNavBtn} onClick={goNext} aria-label="Следующая неделя">&#8250;</button>
+                <button type="button" className={styles.todayBtn} onClick={goToday}>Сегодня</button>
+              </div>
+              <div className={styles.weekToggle}>
+                <button
+                  type="button"
+                  className={`${styles.weekToggleBtn} ${weekCount === 1 ? styles.weekToggleBtnActive : ''}`}
+                  onClick={() => setWeekCount(1)}
+                >1 нед</button>
+                <button
+                  type="button"
+                  className={`${styles.weekToggleBtn} ${weekCount === 2 ? styles.weekToggleBtnActive : ''}`}
+                  onClick={() => setWeekCount(2)}
+                >2 нед</button>
+              </div>
             </div>
 
             <div className={styles.table}>
-              <div className={styles.thead}>
+              <div className={styles.thead} style={{ gridTemplateColumns: `180px repeat(${displayDates.length}, minmax(0, 1fr))` }}>
                 <div className={`${styles.th} ${styles.thSticky}`} />
-                {weekdayOptions.map((d) => (
-                  <div key={d.key} className={styles.th}>
-                    {d.label}
+                {displayDates.map((entry) => (
+                  <div key={entry.dateIso} className={`${styles.th} ${entry.dateIso === todayIso ? styles.thToday : ''}`}>
+                    {entry.label}
                   </div>
                 ))}
               </div>
 
               {timeSlots.map((s) => (
-                <div key={s.key} className={styles.tr}>
+                <div key={s.key} className={styles.tr} style={{ gridTemplateColumns: `180px repeat(${displayDates.length}, minmax(0, 1fr))` }}>
                   <div className={styles.timeCell}>{s.label}</div>
-                  {weekdayOptions.map((d) => {
-                    const lesson = byCell.get(`${d.key}|${s.key}`);
-                    if (!lesson) return <div key={`${d.key}-${s.key}`} className={styles.td} />;
+                  {displayDates.map((entry) => {
+                    const lesson = getLessonForCell(entry.dateIso, entry.weekday, s.key);
+                    if (!lesson) return <div key={`${entry.dateIso}-${s.key}`} className={`${styles.td} ${entry.dateIso === todayIso ? styles.tdToday : ''}`} />;
                     return (
-                      <div key={`${d.key}-${s.key}`} className={styles.td}>
-                        <div className={`${styles.lessonCard} ${cellClass(lesson.type)}`}>
+                      <div key={`${entry.dateIso}-${s.key}`} className={`${styles.td} ${entry.dateIso === todayIso ? styles.tdToday : ''}`}>
+                        <div
+                          className={`${styles.lessonCard} ${cellClass(lesson.type)} ${editMode ? styles.lessonCardEditable : ''}`}
+                          onClick={editMode ? () => openEdit(lesson) : undefined}
+                        >
+                          {editMode && (
+                            <button
+                              type="button"
+                              className={styles.lessonDeleteBtn}
+                              onClick={(e) => { e.stopPropagation(); handleDelete(lesson.id); }}
+                              aria-label="Удалить"
+                            >×</button>
+                          )}
                           <div className={`${styles.pill} ${typePillClass(lesson.type)}`}>{lesson.type}</div>
                           <div className={styles.lessonTitle}>{lesson.subject}</div>
                           <div className={styles.lessonMeta}>
-                            {lesson.group} • {lesson.room}
+                            {[lesson.group, lesson.room].filter(Boolean).join(' • ')}
                           </div>
                         </div>
                       </div>
@@ -405,19 +587,46 @@ const TeacherScheduleView = ({ avatarInitials, userId }: { avatarInitials: strin
               <img src={CloseIcon} className={styles.modalCloseIcon} />
             </button>
 
-            <div className={styles.modalTitle}>Добавить новое занятие</div>
-            <div className={styles.modalSubtitle}>Заполните информацию о занятии</div>
+            <div className={styles.modalTitle}>{editingLessonId ? 'Редактировать занятие' : 'Добавить новое занятие'}</div>
+            <div className={styles.modalSubtitle}>{editingLessonId ? 'Измените информацию о занятии' : 'Заполните информацию о занятии'}</div>
 
             <div className={styles.form}>
               <div className={styles.field}>
-                <div className={styles.label}>День недели</div>
-                <select className={styles.select} value={dayDraft} onChange={(e) => setDayDraft(e.target.value as WeekdayKey)}>
-                  {weekdayOptions.map((d) => (
-                    <option key={d.key} value={d.key}>
-                      {d.label}
-                    </option>
-                  ))}
-                </select>
+                <div className={styles.checkboxRow}>
+                  <label className={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      className={styles.checkbox}
+                      checked={isOneTime}
+                      onChange={(e) => setIsOneTime(e.target.checked)}
+                    />
+                    Разовое занятие
+                  </label>
+                </div>
+                {isOneTime ? (
+                  <>
+                    <div className={styles.label}>Дата</div>
+                    <input
+                      type="date"
+                      className={styles.input}
+                      value={dateDraft}
+                      onChange={(e) => setDateDraft(e.target.value)}
+                    />
+                    <div className={styles.fieldHint}>Занятие пройдёт только в указанную дату</div>
+                  </>
+                ) : (
+                  <>
+                    <div className={styles.label}>День недели</div>
+                    <select className={styles.select} value={dayDraft} onChange={(e) => setDayDraft(e.target.value as WeekdayKey)}>
+                      {weekdayOptions.map((d) => (
+                        <option key={d.key} value={d.key}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className={styles.fieldHint}>Занятие повторяется каждую неделю</div>
+                  </>
+                )}
               </div>
 
               <div className={styles.field}>
@@ -432,10 +641,10 @@ const TeacherScheduleView = ({ avatarInitials, userId }: { avatarInitials: strin
               </div>
 
               <div className={styles.field}>
-                <div className={styles.label}>Предмет</div>
+                <div className={styles.label}>Предмет / Название</div>
                 <input
                   className={styles.input}
-                  placeholder="Введите название предмета"
+                  placeholder="Введите название предмета или встречи"
                   value={subjectDraft}
                   onChange={(e) => setSubjectDraft(e.target.value)}
                 />
@@ -447,17 +656,60 @@ const TeacherScheduleView = ({ avatarInitials, userId }: { avatarInitials: strin
                   <option value="Лекция">Лекция</option>
                   <option value="Семинар">Семинар</option>
                   <option value="Практика">Практика</option>
+                  <option value="Другое">Другое</option>
                 </select>
               </div>
 
               <div className={styles.field}>
+                <div className={styles.checkboxRow}>
+                  <label className={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      className={styles.checkbox}
+                      checked={noGroup}
+                      onChange={(e) => {
+                        setNoGroup(e.target.checked);
+                        if (e.target.checked) {
+                          setGroupDraft('');
+                          setGroupDropdownOpen(false);
+                        }
+                      }}
+                    />
+                    Без группы
+                  </label>
+                </div>
                 <div className={styles.label}>Группа</div>
-                <input
-                  className={styles.input}
-                  placeholder="Введите номер группы"
-                  value={groupDraft}
-                  onChange={(e) => setGroupDraft(e.target.value)}
-                />
+                <div className={styles.autocompleteWrap}>
+                  <input
+                    className={styles.input}
+                    placeholder="Начните вводить название группы"
+                    value={groupDraft}
+                    disabled={noGroup}
+                    onChange={(e) => {
+                      setGroupDraft(e.target.value);
+                      setGroupDropdownOpen(true);
+                    }}
+                    onFocus={() => !noGroup && setGroupDropdownOpen(true)}
+                    onBlur={() => setTimeout(() => setGroupDropdownOpen(false), 200)}
+                  />
+                  {groupDropdownOpen && !noGroup && filteredGroups.length > 0 && (
+                    <div className={styles.groupDropdown}>
+                      {filteredGroups.map((g) => (
+                        <div
+                          key={g}
+                          className={styles.groupOption}
+                          onMouseDown={() => {
+                            setGroupDraft(g);
+                            setGroupDropdownOpen(false);
+                          }}
+                        >
+                          {g}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className={styles.fieldHint}>Например: ИВТ-21-1, ПМ-22-2</div>
               </div>
 
               <div className={styles.field}>
@@ -471,12 +723,14 @@ const TeacherScheduleView = ({ avatarInitials, userId }: { avatarInitials: strin
               </div>
             </div>
 
+            {addError && <div className={styles.formError}>{addError}</div>}
+
             <div className={styles.modalActions}>
               <button type="button" className={styles.btn} onClick={closeAdd}>
                 Отмена
               </button>
               <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={submitAdd}>
-                Добавить занятие
+                {editingLessonId ? 'Сохранить' : 'Добавить занятие'}
               </button>
             </div>
           </div>

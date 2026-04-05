@@ -836,6 +836,20 @@
 .badge3 {
   background: var(--bg-tertiary);
 }
+.taskCardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.taskAssignee {
+  font-size: 11px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
 .badge4,
 .badge5 {
   background: #e5e7eb;

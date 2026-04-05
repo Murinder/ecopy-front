@@ -235,6 +235,92 @@
   font-weight: 400;
 }
 
+.weekNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.weekNavCenter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.weekNavLabel {
+  font-weight: 700;
+  color: #1B2559;
+  font-size: 14px;
+  min-width: 200px;
+  text-align: center;
+}
+
+.weekNavBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  border: 1px solid #E2E8F0;
+  background: #ffffff;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1B2559;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+
+  &:hover {
+    background: #f0f4ff;
+    border-color: #3B82F6;
+  }
+}
+
+.todayBtn {
+  padding: 6px 14px;
+  border-radius: 10px;
+  border: 1px solid #E2E8F0;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  color: #3B82F6;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: #eff6ff;
+  }
+}
+
+.weekToggle {
+  display: flex;
+  gap: 4px;
+}
+
+.weekToggleBtn {
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 1px solid #E2E8F0;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  color: #A3AED0;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: #f0f4ff;
+  }
+}
+
+.weekToggleBtnActive {
+  background: #eff6ff;
+  color: #3B82F6;
+  border-color: #3B82F6;
+}
+
 .table {
   display: flex;
   flex-direction: column;
@@ -243,7 +329,7 @@
 
 .thead {
   display: grid;
-  grid-template-columns: 180px repeat(5, minmax(0, 1fr));
+  grid-template-columns: 180px repeat(5, minmax(0, 1fr)); /* default, overridden by inline style */
 }
 
 .th,
@@ -266,14 +352,14 @@
 
 .tr {
   display: grid;
-  grid-template-columns: 180px repeat(5, minmax(0, 1fr));
+  grid-template-columns: 180px repeat(5, minmax(0, 1fr)); /* default, overridden by inline style */
 }
 
 .thead > :nth-child(1) {
   border-top-left-radius: 12px;
 }
 
-.thead > :nth-child(6) {
+.thead > :last-child {
   border-top-right-radius: 12px;
 }
 
@@ -288,6 +374,15 @@
   min-height: 86px;
 }
 
+.thToday {
+  background: #eff6ff;
+  color: #2563EB;
+}
+
+.tdToday {
+  background: #fafcff;
+}
+
 .lessonCard {
   border-radius: 12px;
   padding: 10px 10px 10px 12px;
@@ -296,6 +391,7 @@
   flex-direction: column;
   gap: 6px;
   min-height: 64px;
+  overflow: hidden;
 }
 
 .cellBlue {
@@ -345,11 +441,25 @@
   color: #7c3aed;
 }
 
+.cellOrange {
+  border-left: 3px solid #f97316;
+  background: #fff7ed;
+}
+
+.pillOrange {
+  background: #ffedd5;
+  border-color: #fed7aa;
+  color: #ea580c;
+}
+
 .lessonTitle {
   font-weight: 600;
   color: #1B2559;
   font-size: 14px;
   line-height: 18px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .lessonMeta {
@@ -357,6 +467,9 @@
   font-size: 12px;
   line-height: 16px;
   font-weight: 400;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .subjects {
@@ -495,6 +608,119 @@
   gap: 8px;
 }
 
+.fieldHint {
+  font-size: 11px;
+  color: #A3AED0;
+  font-weight: 400;
+  margin-top: -4px;
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1B2559;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: #3B82F6;
+  cursor: pointer;
+}
+
+.autocompleteWrap {
+  position: relative;
+}
+
+.groupDropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  background: #ffffff;
+  border: 1.5px solid #E2E8F0;
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  max-height: 200px;
+  overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.groupOption {
+  padding: 10px 16px;
+  font-size: 14px;
+  color: #1B2559;
+  cursor: pointer;
+  transition: background 0.1s;
+
+  &:hover {
+    background: #f0f4ff;
+  }
+}
+
+.secondaryBtnActive {
+  background: #3B82F6;
+  color: #ffffff;
+  border-color: #3B82F6;
+
+  &:hover {
+    background: #2563EB;
+  }
+}
+
+.lessonCardEditable {
+  cursor: pointer;
+  position: relative;
+  transition: box-shadow 0.15s, transform 0.1s;
+
+  &:hover {
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+    transform: translateY(-1px);
+  }
+}
+
+.lessonDeleteBtn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+
+  .lessonCardEditable:hover & {
+    opacity: 1;
+  }
+
+  &:hover {
+    background: #dc2626;
+  }
+}
+
 .label {
   color: #1B2559;
   font-size: 14px;
@@ -518,6 +744,18 @@
 .select:focus {
   border-color: #3B82F6;
   box-shadow: none;
+}
+
+.formError {
+  margin-top: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 .modalActions {
