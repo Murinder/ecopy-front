@@ -998,7 +998,10 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
   const [selectedJoinTeamId, setSelectedJoinTeamId] = useState<string | null>(null);
   const [teamSearchQuery, setTeamSearchQuery] = useState('');
 
-  const myApplications = useMemo(() => myApplicationsData ?? [], [myApplicationsData]);
+  const myApplications = useMemo(
+    () => (myApplicationsData ?? []).filter((a) => !userId || a.userId === userId),
+    [myApplicationsData, userId]
+  );
   const myApplicationByEventId = useMemo(() => {
     const map: Record<string, typeof myApplications[0]> = {};
     myApplications.forEach((a) => { map[a.eventId] = a; });
@@ -1312,6 +1315,11 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                       <div className={styles.cardTitle}>{event?.title ?? app.eventId}</div>
                       {event && <div className={styles.cardDesc}>{event.date} · {event.place}</div>}
                       {app.motivation && <div className={styles.cardDesc} style={{ marginTop: 4, fontStyle: 'italic' }}>{app.motivation}</div>}
+                      {(app.participantRole === 'TEAM_CREATOR' || app.participantRole === 'TEAM_JOINER') && (
+                        <div className={styles.cardDesc} style={{ marginTop: 4 }}>
+                          {app.participantRole === 'TEAM_CREATOR' ? 'Создатель команды' : 'Участник команды'}
+                        </div>
+                      )}
                       {statusKey === 'SUBMITTED' && (
                         <div className={styles.modalActions} style={{ marginTop: 12 }}>
                           <button
@@ -1485,11 +1493,16 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                       </button>
                     </div>
 
-                    {/* Команда — показывается только после одобрения заявки */}
+                    {/* Команда — TEAM_CREATOR видит сразу после создания, TEAM_JOINER — после одобрения */}
                     {selected.tag === 'Хакатон' && myTeam && (() => {
                       const existingApp = myApplicationByEventId[selected.id];
-                      const isApproved = existingApp && existingApp.status === 'APPROVED';
-                      if (!isApproved) return null;
+                      const isSelfCreated = myTeam.createdBy === userId;
+                      const shouldShow = existingApp && (
+                        isSelfCreated
+                          ? (existingApp.status === 'SUBMITTED' || existingApp.status === 'APPROVED')
+                          : existingApp.status === 'APPROVED'
+                      );
+                      if (!shouldShow) return null;
                       return (
                         <div style={{ marginTop: 16 }}>
                           <div className={styles.sectionLabel}>Ваша команда</div>
