@@ -39,6 +39,7 @@ const STATUS_RU: Record<string, string> = {
   TO_DO: 'К выполнению', IN_PROGRESS: 'В процессе', REVIEW: 'На проверке', DONE: 'Выполнено', BLOCKED: 'Заблокировано',
 };
 
+
 const formatProjectDate = (d?: string) => {
   if (!d) return '—';
   const [y, m, day] = d.split('-').map(Number);
