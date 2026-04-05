@@ -1462,3 +1462,56 @@
   font-size: 14px;
   padding: 20px 0;
 }
+
+.teacherApplicantsSection { margin-top: 8px; }
+
+.teacherApplicantsList {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.teacherApplicantRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.teacherApplicantName {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.teacherApplicantRole {
+  font-size: 12px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.teacherApplicantActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.teacherDeleteConfirm {
+  margin-top: 4px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #fff5f5;
+  border: 1px solid #fecaca;
+  font-size: 14px;
+  color: #991b1b;
+}

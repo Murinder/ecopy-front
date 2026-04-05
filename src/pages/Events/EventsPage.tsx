@@ -19,12 +19,15 @@ import {
   useGetTeacherEventsQuery,
   useCreateEventMutation,
   useUpdateEventMutation,
+  useDeleteEventMutation,
   useApplyToEventMutation,
   useCancelApplicationMutation,
   useGetMyApplicationsQuery,
   useGetEventTeamsQuery,
   useGetTeamJoinRequestsQuery,
   useTeamDecisionMutation,
+  useGetEventApplicationsQuery,
+  useUpdateApplicationStatusMutation,
 } from '../../services/eventApi';
 import type { TeacherEventViewDto } from '../../services/eventApi';
 
@@ -135,6 +138,19 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
 
   const [createEvent, { isLoading: createEventLoading }] = useCreateEventMutation();
   const [updateEvent, { isLoading: updateEventLoading }] = useUpdateEventMutation();
+  const [deleteEvent, { isLoading: deletingEvent }] = useDeleteEventMutation();
+  const [updateApplicationStatus, { isLoading: updatingStatus }] = useUpdateApplicationStatusMutation();
+
+  const [applicationsOpen, setApplicationsOpen] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  const { data: eventApplications = [], isFetching: applicationsLoading } =
+    useGetEventApplicationsQuery(teacherSelectedId ?? '', {
+      skip: !teacherSelectedId || !applicationsOpen,
+    });
+
+  const pendingApplications = eventApplications.filter((a) => a.status === 'SUBMITTED');
 
   const [teacherEditMode, setTeacherEditMode] = useState(false);
   const [teacherEditType, setTeacherEditType] = useState<TeacherEventType | ''>('');
@@ -248,7 +264,13 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
     setTeacherViewDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1));
   };
 
-  const teacherCloseDetails = () => { setTeacherSelectedId(null); setTeacherEditMode(false); };
+  const teacherCloseDetails = () => {
+    setTeacherSelectedId(null);
+    setTeacherEditMode(false);
+    setApplicationsOpen(false);
+    setDeleteConfirm(false);
+    setDeleteError('');
+  };
   const teacherCloseCreate = () => setTeacherCreateOpen(false);
 
   const openEditMode = () => {
@@ -265,6 +287,22 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
     setTeacherEditStatus(teacherSelected.status ?? 'PUBLISHED');
     setTeacherEditError('');
     setTeacherEditMode(true);
+  };
+
+  const handleApplicationDecision = async (appId: string, status: 'APPROVED' | 'REJECTED') => {
+    try {
+      await updateApplicationStatus({ id: appId, status }).unwrap();
+    } catch { /* tag invalidation triggers refetch */ }
+  };
+
+  const handleDeleteEvent = async () => {
+    if (!teacherSelectedId) return;
+    try {
+      await deleteEvent(teacherSelectedId).unwrap();
+      teacherCloseDetails();
+    } catch (err: unknown) {
+      setDeleteError((err as { data?: { message?: string } })?.data?.message || 'Не удалось удалить мероприятие');
+    }
   };
 
   const submitEdit = async () => {
@@ -590,6 +628,85 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                     <img src={FileIcon} className={styles.teacherBtnIcon} />
                     Экспортировать в календарь
                   </button>
+                </div>
+
+                <div className={styles.teacherApplicantsSection}>
+                  <button
+                    type="button"
+                    className={styles.teacherSecondaryBtn}
+                    onClick={() => setApplicationsOpen((prev) => !prev)}
+                    style={{ marginTop: 12 }}
+                  >
+                    {applicationsOpen ? 'Скрыть заявки' : 'Заявки на участие'}
+                  </button>
+
+                  {applicationsOpen && (
+                    <div className={styles.teacherApplicantsList}>
+                      {applicationsLoading && (
+                        <div className={styles.teacherUpcomingEmpty}>Загрузка заявок...</div>
+                      )}
+                      {!applicationsLoading && pendingApplications.length === 0 && (
+                        <div className={styles.teacherUpcomingEmpty}>Нет заявок на рассмотрении</div>
+                      )}
+                      {pendingApplications.map((app) => (
+                        <div key={app.id} className={styles.teacherApplicantRow}>
+                          <div className={styles.teacherApplicantName}>{app.userName ?? app.userId}</div>
+                          <div className={styles.teacherApplicantRole}>
+                            {app.participantRole === 'TEAM_CREATOR' ? 'Создатель команды'
+                              : app.participantRole === 'PARTICIPANT' ? 'Участник'
+                              : app.participantRole ?? ''}
+                          </div>
+                          <div className={styles.teacherApplicantActions}>
+                            <button
+                              type="button"
+                              className={styles.teacherSubmitBtn}
+                              style={{ height: 36, fontSize: 13, padding: '0 16px' }}
+                              disabled={updatingStatus}
+                              onClick={() => handleApplicationDecision(app.id, 'APPROVED')}
+                            >Одобрить</button>
+                            <button
+                              type="button"
+                              className={styles.teacherCancelBtn}
+                              style={{ height: 36, fontSize: 13, padding: '0 16px' }}
+                              disabled={updatingStatus}
+                              onClick={() => handleApplicationDecision(app.id, 'REJECTED')}
+                            >Отклонить</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className={styles.teacherApplicantsSection}>
+                  {!deleteConfirm ? (
+                    <button
+                      type="button"
+                      className={styles.teacherCancelBtn}
+                      style={{ marginTop: 4, width: '100%' }}
+                      onClick={() => setDeleteConfirm(true)}
+                    >
+                      Удалить мероприятие
+                    </button>
+                  ) : (
+                    <div className={styles.teacherDeleteConfirm}>
+                      <span>Удалить мероприятие безвозвратно?</span>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                        <button
+                          type="button"
+                          className={styles.teacherCancelBtn}
+                          disabled={deletingEvent}
+                          onClick={handleDeleteEvent}
+                        >Да, удалить</button>
+                        <button
+                          type="button"
+                          className={styles.teacherSecondaryBtn}
+                          onClick={() => { setDeleteConfirm(false); setDeleteError(''); }}
+                        >Отмена</button>
+                      </div>
+                      {deleteError && <div className={styles.teacherEditError}>{deleteError}</div>}
+                    </div>
+                  )}
                 </div>
               </>
             ) : (

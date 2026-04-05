@@ -208,6 +208,10 @@ export const eventApi = createApi({
       }),
       invalidatesTags: ['Events'],
     }),
+    deleteEvent: builder.mutation<void, string>({
+      query: (id) => ({ url: `/api/v1/events/${id}`, method: 'DELETE' }),
+      invalidatesTags: ['Events'],
+    }),
     getLessons: builder.query<ApiResponse<LessonDto[]>, { userId: string; semester?: number }>({
       query: ({ userId, semester }) => ({
         url: '/api/v1/events/schedule/lessons',
@@ -269,7 +273,7 @@ export const eventApi = createApi({
     }),
     cancelApplication: builder.mutation<void, string>({
       query: (id) => ({ url: `/api/v1/event-applications/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['Applications'],
+      invalidatesTags: ['Applications', 'Teams'],
     }),
     getMyApplications: builder.query<EventApplicationDto[], void>({
       query: () => '/api/v1/event-applications/my',
@@ -278,6 +282,10 @@ export const eventApi = createApi({
     updateApplicationStatus: builder.mutation<EventApplicationDto, { id: string; status: string }>({
       query: ({ id, status }) => ({ url: `/api/v1/event-applications/${id}`, method: 'PUT', body: { status } }),
       invalidatesTags: ['Applications'],
+    }),
+    getEventApplications: builder.query<EventApplicationDto[], string>({
+      query: (eventId) => `/api/v1/events/${eventId}/applications`,
+      providesTags: ['Applications'],
     }),
 
     // Teams
@@ -322,6 +330,7 @@ export const {
   useGetTeacherEventsQuery,
   useCreateEventMutation,
   useUpdateEventMutation,
+  useDeleteEventMutation,
   useGetLessonsQuery,
   useCreateLessonMutation,
   useUpdateLessonMutation,
@@ -333,6 +342,7 @@ export const {
   useCancelApplicationMutation,
   useGetMyApplicationsQuery,
   useUpdateApplicationStatusMutation,
+  useGetEventApplicationsQuery,
   useGetEventTeamsQuery,
   useCreateTeamMutation,
   useJoinTeamMutation,
