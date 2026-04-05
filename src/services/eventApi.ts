@@ -43,6 +43,20 @@ export interface CreateEventDto {
   createdBy: string;
   location?: string;
   maxParticipants?: number;
+  status?: string;
+}
+
+export interface UpdateEventDto {
+  id: string;
+  title?: string;
+  description?: string;
+  startDate?: string;
+  endDate?: string;
+  format?: 'ONLINE' | 'OFFLINE' | 'HYBRID';
+  status?: string;
+  eventType?: string;
+  location?: string;
+  maxParticipants?: number;
 }
 
 export interface EventApplicationDto {
@@ -186,6 +200,14 @@ export const eventApi = createApi({
       }),
       invalidatesTags: ['Events'],
     }),
+    updateEvent: builder.mutation<ApiResponse<unknown>, UpdateEventDto>({
+      query: ({ id, ...body }) => ({
+        url: `/api/v1/events/${id}`,
+        method: 'PUT',
+        body,
+      }),
+      invalidatesTags: ['Events'],
+    }),
     getLessons: builder.query<ApiResponse<LessonDto[]>, { userId: string; semester?: number }>({
       query: ({ userId, semester }) => ({
         url: '/api/v1/events/schedule/lessons',
@@ -299,6 +321,7 @@ export const {
   useGetStudentEventsQuery,
   useGetTeacherEventsQuery,
   useCreateEventMutation,
+  useUpdateEventMutation,
   useGetLessonsQuery,
   useCreateLessonMutation,
   useUpdateLessonMutation,

@@ -1817,12 +1817,6 @@ const KanbanColumn = ({
                   )}
                 </div>
                 <div className={styles.taskCardRow}>
-                  <span className={styles.taskCardLabel}>Статус</span>
-                  <div className={styles.badge3}>
-                    <p className={styles.a32}>{STATUS_RU[t.status] || t.status}</p>
-                  </div>
-                </div>
-                <div className={styles.taskCardRow}>
                   <span className={styles.taskCardLabel}>Исполнитель</span>
                   {canChangeAssignee ? (
                     <select

@@ -18,6 +18,7 @@ import {
   useGetStudentEventsQuery,
   useGetTeacherEventsQuery,
   useCreateEventMutation,
+  useUpdateEventMutation,
   useApplyToEventMutation,
   useCancelApplicationMutation,
   useGetMyApplicationsQuery,
@@ -58,6 +59,7 @@ type TeacherEvent = {
   durationMin: number;
   place: string;
   participantCount: number;
+  status?: string;
 };
 
 const monthName = (monthIndex: number) => {
@@ -129,8 +131,22 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
   const [teacherCreateParticipants, setTeacherCreateParticipants] = useState('');
   const [teacherCreateOnline, setTeacherCreateOnline] = useState(false);
   const [teacherCreateError, setTeacherCreateError] = useState('');
+  const [teacherCreateStatus, setTeacherCreateStatus] = useState('PUBLISHED');
 
   const [createEvent, { isLoading: createEventLoading }] = useCreateEventMutation();
+  const [updateEvent, { isLoading: updateEventLoading }] = useUpdateEventMutation();
+
+  const [teacherEditMode, setTeacherEditMode] = useState(false);
+  const [teacherEditType, setTeacherEditType] = useState<TeacherEventType | ''>('');
+  const [teacherEditTitle, setTeacherEditTitle] = useState('');
+  const [teacherEditSubtitle, setTeacherEditSubtitle] = useState('');
+  const [teacherEditDate, setTeacherEditDate] = useState('');
+  const [teacherEditTime, setTeacherEditTime] = useState('');
+  const [teacherEditDuration, setTeacherEditDuration] = useState('60');
+  const [teacherEditPlace, setTeacherEditPlace] = useState('');
+  const [teacherEditOnline, setTeacherEditOnline] = useState(false);
+  const [teacherEditError, setTeacherEditError] = useState('');
+  const [teacherEditStatus, setTeacherEditStatus] = useState('PUBLISHED');
 
   const teacherEvents: TeacherEvent[] = useMemo(() => {
     if (!apiEvents?.success || !apiEvents.data) return [];
@@ -144,6 +160,7 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
       durationMin: e.durationMin,
       place: e.place,
       participantCount: e.participantCount,
+      status: e.status,
     }));
   }, [apiEvents]);
 
@@ -231,8 +248,53 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
     setTeacherViewDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1));
   };
 
-  const teacherCloseDetails = () => setTeacherSelectedId(null);
+  const teacherCloseDetails = () => { setTeacherSelectedId(null); setTeacherEditMode(false); };
   const teacherCloseCreate = () => setTeacherCreateOpen(false);
+
+  const openEditMode = () => {
+    if (!teacherSelected) return;
+    setTeacherEditType(teacherSelected.type);
+    setTeacherEditTitle(teacherSelected.title);
+    setTeacherEditSubtitle(teacherSelected.subtitle);
+    setTeacherEditDate(teacherSelected.dateISO.slice(0, 10));
+    setTeacherEditTime(teacherSelected.time);
+    setTeacherEditDuration(String(teacherSelected.durationMin));
+    const isOnline = teacherSelected.place.startsWith('http');
+    setTeacherEditOnline(isOnline);
+    setTeacherEditPlace(teacherSelected.place);
+    setTeacherEditStatus(teacherSelected.status ?? 'PUBLISHED');
+    setTeacherEditError('');
+    setTeacherEditMode(true);
+  };
+
+  const submitEdit = async () => {
+    if (!teacherSelected || !teacherEditTitle.trim() || !teacherEditDate || !teacherEditTime) return;
+    setTeacherEditError('');
+    const durationMin = Math.max(5, Number(teacherEditDuration) || 60);
+    const startDate = `${teacherEditDate}T${teacherEditTime}:00+03:00`;
+    const [hh, mm] = teacherEditTime.split(':').map(Number);
+    const endMinutes = hh * 60 + mm + durationMin;
+    const endH = String(Math.floor(endMinutes / 60) % 24).padStart(2, '0');
+    const endM = String(endMinutes % 60).padStart(2, '0');
+    const endDate = `${teacherEditDate}T${endH}:${endM}:00+03:00`;
+    try {
+      await updateEvent({
+        id: teacherSelected.id,
+        title: teacherEditTitle.trim(),
+        description: teacherEditSubtitle.trim() || undefined,
+        startDate,
+        endDate,
+        format: teacherEditOnline ? 'ONLINE' : 'OFFLINE',
+        eventType: teacherEditType || undefined,
+        location: teacherEditPlace.trim() || undefined,
+        status: teacherEditStatus,
+      }).unwrap();
+      setTeacherEditMode(false);
+      teacherCloseDetails();
+    } catch (err: unknown) {
+      setTeacherEditError((err as { data?: { message?: string } })?.data?.message || 'Не удалось сохранить');
+    }
+  };
 
   const teacherOpenCreate = () => {
     setTeacherCreateOpen(true);
@@ -242,12 +304,14 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
     setTeacherCreateSubtitle('');
     const y = teacherViewDate.getFullYear();
     const m = teacherViewDate.getMonth();
-    setTeacherCreateDate(`${y}-${String(m + 1).padStart(2, '0')}-01`);
+    const day = teacherSelectedDay ?? new Date().getDate();
+    setTeacherCreateDate(`${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
     setTeacherCreateTime('');
     setTeacherCreateDuration('60');
     setTeacherCreatePlace('');
     setTeacherCreateParticipants('');
     setTeacherCreateOnline(false);
+    setTeacherCreateStatus('PUBLISHED');
   };
 
   const teacherSubmitCreate = async () => {
@@ -272,6 +336,7 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
         eventType: teacherCreateType,
         createdBy: userId,
         location: teacherCreateOnline ? (teacherCreatePlace.trim() || 'Онлайн') : (teacherCreatePlace.trim() || undefined),
+        status: teacherCreateStatus,
       }).unwrap();
       setTeacherCreateOpen(false);
     } catch (err: unknown) {
@@ -464,63 +529,179 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
               ×
             </button>
 
-            <div className={teacherTypePillClass(teacherSelected.type)}>{teacherSelected.type}</div>
-            <div className={styles.teacherModalTitle}>{teacherSelected.title}</div>
-            <div className={styles.teacherModalSubtitle}>{teacherSelected.subtitle}</div>
+            {!teacherEditMode ? (
+              <>
+                <div className={teacherTypePillClass(teacherSelected.type)}>{teacherSelected.type}</div>
+                <div className={styles.teacherModalTitle}>{teacherSelected.title}</div>
+                <div className={styles.teacherModalSubtitle}>{teacherSelected.subtitle}</div>
 
-            <div className={styles.teacherInfoGrid}>
-              <div className={styles.teacherInfoItem}>
-                <div className={`${styles.teacherInfoIconWrap} ${styles.teacherWrapBlue}`}>
-                  <img src={CalendarIcon} className={styles.teacherInfoIcon} />
-                </div>
-                <div>
-                  <div className={styles.teacherInfoLabel}>Дата</div>
-                  <div className={styles.teacherInfoValue}>
-                    {Number(teacherSelected.dateISO.slice(8, 10))} {monthNameGenitive(Number(teacherSelected.dateISO.slice(5, 7)) - 1)} {teacherSelected.dateISO.slice(0, 4)} г.
+                <div className={styles.teacherInfoGrid}>
+                  <div className={styles.teacherInfoItem}>
+                    <div className={`${styles.teacherInfoIconWrap} ${styles.teacherWrapBlue}`}>
+                      <img src={CalendarIcon} className={styles.teacherInfoIcon} />
+                    </div>
+                    <div>
+                      <div className={styles.teacherInfoLabel}>Дата</div>
+                      <div className={styles.teacherInfoValue}>
+                        {Number(teacherSelected.dateISO.slice(8, 10))} {monthNameGenitive(Number(teacherSelected.dateISO.slice(5, 7)) - 1)} {teacherSelected.dateISO.slice(0, 4)} г.
+                      </div>
+                    </div>
+                  </div>
+                  <div className={styles.teacherInfoItem}>
+                    <div className={`${styles.teacherInfoIconWrap} ${styles.teacherWrapGreen}`}>
+                      <img src={ScheduleIcon} className={styles.teacherInfoIcon} />
+                    </div>
+                    <div>
+                      <div className={styles.teacherInfoLabel}>Время</div>
+                      <div className={styles.teacherInfoValue}>
+                        {teacherSelected.time} ({teacherSelected.durationMin} мин)
+                      </div>
+                    </div>
+                  </div>
+                  <div className={styles.teacherInfoItem}>
+                    <div className={`${styles.teacherInfoIconWrap} ${styles.teacherWrapPurple}`}>
+                      <img src={LocationIcon} className={styles.teacherInfoIcon} />
+                    </div>
+                    <div>
+                      <div className={styles.teacherInfoLabel}>Место</div>
+                      <div className={styles.teacherInfoValue}>{teacherSelected.place}</div>
+                    </div>
+                  </div>
+                  <div className={styles.teacherInfoItem}>
+                    <div className={`${styles.teacherInfoIconWrap} ${styles.teacherWrapOrange}`}>
+                      <img src={PeopleIcon} className={styles.teacherInfoIcon} />
+                    </div>
+                    <div>
+                      <div className={styles.teacherInfoLabel}>Участники</div>
+                      <div className={styles.teacherInfoValue}>{teacherSelected.participantCount} чел.</div>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className={styles.teacherInfoItem}>
-                <div className={`${styles.teacherInfoIconWrap} ${styles.teacherWrapGreen}`}>
-                  <img src={ScheduleIcon} className={styles.teacherInfoIcon} />
+
+                <div className={styles.teacherModalActions}>
+                  <button type="button" className={styles.teacherPrimaryBtn} onClick={openEditMode}>
+                    Редактировать
+                  </button>
+                  <button type="button" className={styles.teacherPrimaryBtn} onClick={() => window.alert('Напоминание отправлено (демо)')}>
+                    <img src={ChatIcon} className={styles.teacherBtnIcon} />
+                    Отправить напоминание
+                  </button>
+                  <button type="button" className={styles.teacherSecondaryBtn} onClick={() => teacherDownloadIcs(teacherSelected)}>
+                    <img src={FileIcon} className={styles.teacherBtnIcon} />
+                    Экспортировать в календарь
+                  </button>
                 </div>
-                <div>
-                  <div className={styles.teacherInfoLabel}>Время</div>
-                  <div className={styles.teacherInfoValue}>
-                    {teacherSelected.time} ({teacherSelected.durationMin} мин)
+              </>
+            ) : (
+              <>
+                <div className={styles.teacherCreateTitle}>Редактировать мероприятие</div>
+                <div className={styles.teacherForm}>
+                  <div className={styles.teacherField}>
+                    <div className={styles.teacherLabel}>Тип мероприятия</div>
+                    <select
+                      className={styles.teacherSelect}
+                      value={teacherEditType}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v === 'Консультация' || v === 'Хакатон' || v === 'Конференция' || v === 'Акселератор' || v === 'Карьера' || v === 'Другое') setTeacherEditType(v);
+                        else setTeacherEditType('');
+                      }}
+                    >
+                      <option value="">Выберите тип</option>
+                      <option value="Консультация">Консультация</option>
+                      <option value="Хакатон">Хакатон</option>
+                      <option value="Конференция">Конференция</option>
+                      <option value="Акселератор">Акселератор</option>
+                      <option value="Карьера">Карьера</option>
+                      <option value="Другое">Другое</option>
+                    </select>
+                  </div>
+
+                  <div className={styles.teacherField}>
+                    <div className={styles.teacherLabel}>Название</div>
+                    <input
+                      className={styles.teacherInput}
+                      placeholder="Введите название мероприятия"
+                      value={teacherEditTitle}
+                      onChange={(e) => setTeacherEditTitle(e.target.value)}
+                    />
+                  </div>
+
+                  <div className={styles.teacherRow2}>
+                    <div className={styles.teacherField}>
+                      <div className={styles.teacherLabel}>Дата</div>
+                      <input className={styles.teacherInput} type="date" value={teacherEditDate} onChange={(e) => setTeacherEditDate(e.target.value)} />
+                    </div>
+                    <div className={styles.teacherField}>
+                      <div className={styles.teacherLabel}>Время начала</div>
+                      <input className={styles.teacherInput} type="time" value={teacherEditTime} onChange={(e) => setTeacherEditTime(e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div className={styles.teacherRow2}>
+                    <div className={styles.teacherField}>
+                      <div className={styles.teacherLabel}>Длительность (мин)</div>
+                      <input className={styles.teacherInput} inputMode="numeric" value={teacherEditDuration} onChange={(e) => setTeacherEditDuration(e.target.value)} />
+                    </div>
+                    <div className={styles.teacherField}>
+                      <div className={styles.teacherLabel}>{teacherEditOnline ? 'Ссылка для подключения' : 'Место'}</div>
+                      <input
+                        className={styles.teacherInput}
+                        placeholder={teacherEditOnline ? 'https://zoom.us/...' : 'Кабинет 401'}
+                        value={teacherEditPlace}
+                        onChange={(e) => setTeacherEditPlace(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className={styles.teacherField}>
+                    <div className={styles.teacherLabel}>Описание</div>
+                    <textarea
+                      className={styles.teacherTextarea}
+                      placeholder="Добавьте описание мероприятия"
+                      value={teacherEditSubtitle}
+                      onChange={(e) => setTeacherEditSubtitle(e.target.value)}
+                    />
+                  </div>
+
+                  <label className={styles.teacherCheckboxRow}>
+                    <input type="checkbox" checked={teacherEditOnline} onChange={(e) => { setTeacherEditOnline(e.target.checked); setTeacherEditPlace(''); }} />
+                    Онлайн мероприятие
+                  </label>
+
+                  <div className={styles.teacherField}>
+                    <div className={styles.teacherLabel}>Статус</div>
+                    <select
+                      className={styles.teacherSelect}
+                      value={teacherEditStatus}
+                      onChange={(e) => setTeacherEditStatus(e.target.value)}
+                    >
+                      <option value="DRAFT">Черновик (скрыто от студентов)</option>
+                      <option value="PUBLISHED">Опубликовано</option>
+                      <option value="REGISTRATION_OPEN">Регистрация открыта</option>
+                      <option value="COMPLETED">Завершено</option>
+                      <option value="CANCELLED">Отменено</option>
+                    </select>
                   </div>
                 </div>
-              </div>
-              <div className={styles.teacherInfoItem}>
-                <div className={`${styles.teacherInfoIconWrap} ${styles.teacherWrapPurple}`}>
-                  <img src={LocationIcon} className={styles.teacherInfoIcon} />
-                </div>
-                <div>
-                  <div className={styles.teacherInfoLabel}>Место</div>
-                  <div className={styles.teacherInfoValue}>{teacherSelected.place}</div>
-                </div>
-              </div>
-              <div className={styles.teacherInfoItem}>
-                <div className={`${styles.teacherInfoIconWrap} ${styles.teacherWrapOrange}`}>
-                  <img src={PeopleIcon} className={styles.teacherInfoIcon} />
-                </div>
-                <div>
-                  <div className={styles.teacherInfoLabel}>Участники</div>
-                  <div className={styles.teacherInfoValue}>{teacherSelected.participantCount} чел.</div>
-                </div>
-              </div>
-            </div>
 
-            <div className={styles.teacherModalActions}>
-              <button type="button" className={styles.teacherPrimaryBtn} onClick={() => window.alert('Напоминание отправлено (демо)')}>
-                <img src={ChatIcon} className={styles.teacherBtnIcon} />
-                Отправить напоминание
-              </button>
-              <button type="button" className={styles.teacherSecondaryBtn} onClick={() => teacherDownloadIcs(teacherSelected)}>
-                <img src={FileIcon} className={styles.teacherBtnIcon} />
-                Экспортировать в календарь
-              </button>
-            </div>
+                {teacherEditError && <div className={styles.teacherCreateError}>{teacherEditError}</div>}
+
+                <div className={styles.teacherCreateActions}>
+                  <button type="button" className={styles.teacherCancelBtn} onClick={() => setTeacherEditMode(false)}>
+                    Отмена
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.teacherSubmitBtn}
+                    onClick={submitEdit}
+                    disabled={updateEventLoading}
+                  >
+                    {updateEventLoading ? 'Сохранение...' : 'Сохранить'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -618,6 +799,19 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                 <input type="checkbox" checked={teacherCreateOnline} onChange={(e) => { setTeacherCreateOnline(e.target.checked); setTeacherCreatePlace(''); }} />
                 Онлайн мероприятие
               </label>
+
+              <div className={styles.teacherField}>
+                <div className={styles.teacherLabel}>Статус</div>
+                <select
+                  className={styles.teacherSelect}
+                  value={teacherCreateStatus}
+                  onChange={(e) => setTeacherCreateStatus(e.target.value)}
+                >
+                  <option value="DRAFT">Черновик (скрыто от студентов)</option>
+                  <option value="PUBLISHED">Опубликовано</option>
+                  <option value="REGISTRATION_OPEN">Регистрация открыта</option>
+                </select>
+              </div>
             </div>
 
             {teacherCreateError && <div className={styles.teacherCreateError}>{teacherCreateError}</div>}
@@ -812,7 +1006,7 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
     const eventType = applyModalEvent?.eventType;
 
     try {
-      if (eventType === 'Конференция' || eventType === 'Акселератор' || eventType === 'Карьера') {
+      if (eventType === 'Конференция' || eventType === 'Акселератор') {
         if (!applyParticipantRole) {
           setApplyError('Выберите роль: Участник или Наблюдатель');
           return;
@@ -1247,7 +1441,7 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
             </div>
 
             {/* === Конференция / Акселератор / Карьера === */}
-            {(applyModalEvent.eventType === 'Конференция' || applyModalEvent.eventType === 'Акселератор' || applyModalEvent.eventType === 'Карьера') && (
+            {(applyModalEvent.eventType === 'Конференция' || applyModalEvent.eventType === 'Акселератор') && (
               <>
                 <div className={styles.teacherField} style={{ marginTop: 16 }}>
                   <div className={styles.teacherLabel}>Роль участия *</div>
@@ -1389,7 +1583,7 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
             )}
 
             {/* === Консультация / Другое / default === */}
-            {applyModalEvent.eventType !== 'Конференция' && applyModalEvent.eventType !== 'Акселератор' && applyModalEvent.eventType !== 'Карьера' && applyModalEvent.eventType !== 'Хакатон' && (
+            {applyModalEvent.eventType !== 'Конференция' && applyModalEvent.eventType !== 'Акселератор' && applyModalEvent.eventType !== 'Хакатон' && (
               <>
                 <div className={styles.teacherField} style={{ marginTop: 16 }}>
                   <div className={styles.teacherLabel}>Мотивация *</div>
