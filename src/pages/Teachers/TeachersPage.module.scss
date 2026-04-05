@@ -1,6 +1,6 @@
 .page {
   display: flex;
-  width: 100vw;
+  width: 100%;
   min-height: 100vh;
   background: #f9fafb;
   color: #0a0a0a;
@@ -612,7 +612,7 @@
     flex-direction: column;
   }
   .topbar {
-    padding: 12px 16px;
+    padding: 12px 16px 12px 56px;
   }
   .main {
     padding: 16px;

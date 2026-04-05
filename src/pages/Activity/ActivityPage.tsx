@@ -409,24 +409,26 @@ const StudentActivityView = ({ avatarInitials }: { avatarInitials: string }) => 
                 <div className={styles.cardSubtitle}>Оценки и посещаемость</div>
               </div>
               {d?.subjectsData?.length ? (
-                <table className={styles.simpleTable}>
-                  <thead>
-                    <tr>
-                      <th>Предмет</th>
-                      <th>Оценка</th>
-                      <th>Посещаемость</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {d.subjectsData.map((s: SubjectItem) => (
-                      <tr key={s.name}>
-                        <td>{s.name}</td>
-                        <td>{s.grade}%</td>
-                        <td>{s.attendance}%</td>
+                <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                  <table className={styles.simpleTable}>
+                    <thead>
+                      <tr>
+                        <th>Предмет</th>
+                        <th>Оценка</th>
+                        <th>Посещаемость</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {d.subjectsData.map((s: SubjectItem) => (
+                        <tr key={s.name}>
+                          <td>{s.name}</td>
+                          <td>{s.grade}%</td>
+                          <td>{s.attendance}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               ) : (
                 <p className={styles.empty}>Нет данных</p>
               )}
@@ -514,26 +516,28 @@ const HeadAnalyticsView = ({ avatarInitials }: { avatarInitials: string }) => {
                       </div>
                     </div>
                     {d?.performanceByGroup?.length ? (
-                      <table className={styles.simpleTable}>
-                        <thead>
-                          <tr>
-                            <th>Группа</th>
-                            <th>Активность</th>
-                            <th>Посещаемость</th>
-                            <th>Ср. балл</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {d.performanceByGroup.map((g: GroupPerformance) => (
-                            <tr key={g.name}>
-                              <td>{g.name}</td>
-                              <td>{g.activity}%</td>
-                              <td>{g.attendance}%</td>
-                              <td>{g.avgGrade}</td>
+                      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                        <table className={styles.simpleTable}>
+                          <thead>
+                            <tr>
+                              <th>Группа</th>
+                              <th>Активность</th>
+                              <th>Посещаемость</th>
+                              <th>Ср. балл</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {d.performanceByGroup.map((g: GroupPerformance) => (
+                              <tr key={g.name}>
+                                <td>{g.name}</td>
+                                <td>{g.activity}%</td>
+                                <td>{g.attendance}%</td>
+                                <td>{g.avgGrade}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     ) : (
                       <p className={styles.empty}>Нет данных</p>
                     )}

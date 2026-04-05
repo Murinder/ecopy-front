@@ -798,6 +798,7 @@ const HeadDefenseScheduleView = ({ avatarInitials, userId }: { avatarInitials: s
                 <div className={styles.cardTitle}>Расписание защит</div>
                 <div className={styles.cardSubtitle}>Найдено: {filteredDefenses.length}</div>
               </div>
+              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
               <table className={styles.defenseTable}>
                 <thead className={styles.defenseTableHead}>
                   <tr>
@@ -839,6 +840,7 @@ const HeadDefenseScheduleView = ({ avatarInitials, userId }: { avatarInitials: s
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
 

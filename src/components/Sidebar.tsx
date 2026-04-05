@@ -1,5 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import sidebarStyles from '../pages/Projects/ProjectsPage.module.scss';
 import ProjectsIcon from '../assets/icons/mjbmqg4r-q680ssd.svg';
 import ActivityIcon from '../assets/icons/mjbmqg4r-bnrz516.svg';
@@ -84,121 +85,175 @@ const Sidebar = () => {
   const { portalSubtitle, items } = useMemo(() => navForRole(userRole), [userRole]);
   const initials = useMemo(() => initialsFromName(userName), [userName]);
 
-  const openPlaceholder = () => {
-    window.alert('Раздел в разработке');
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Lock body scroll when drawer is open on mobile
+  useEffect(() => {
+    if (isMobile && drawerOpen) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    }
+  }, [isMobile, drawerOpen]);
+
+  // Close drawer on route change
+  useEffect(() => {
+    if (isMobile) setDrawerOpen(false);
+  }, [location.pathname, isMobile]);
+
+  const handleNav = (path?: string) => {
+    if (path) {
+      navigate(path);
+    } else {
+      window.alert('Раздел в разработке');
+    }
   };
 
+  const sidebarClassName = isMobile
+    ? `${sidebarStyles.sidebar} ${drawerOpen ? sidebarStyles.sidebarOpen : sidebarStyles.sidebarClosed}`
+    : sidebarStyles.sidebar;
+
   return (
-    <div className={sidebarStyles.sidebar}>
-      <div className={sidebarStyles.container2}>
-        <div className={sidebarStyles.icon}>
-          <div className={sidebarStyles.autoWrapper}>
-            <div className={sidebarStyles.vector} />
-            <div className={sidebarStyles.vector2} />
-          </div>
-          <div className={sidebarStyles.autoWrapper2}>
-            <div className={sidebarStyles.vector3} />
-            <div className={sidebarStyles.vector4} />
-          </div>
-        </div>
-        <div className={sidebarStyles.container}>
-          <p className={sidebarStyles.a2}>ЕЦОПУ</p>
-          <div className={sidebarStyles.paragraph}>
-            <p className={sidebarStyles.a3}>{portalSubtitle}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className={sidebarStyles.navigation}>
-        {items.map((it) => {
-          const isActive = Boolean(it.path) && location.pathname === it.path;
-          return (
-            <div
-              key={it.key}
-              className={isActive ? sidebarStyles.button : sidebarStyles.button2}
-              onClick={() => (it.path ? navigate(it.path) : openPlaceholder())}
-              tabIndex={0}
-              role="button"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  if (it.path) navigate(it.path);
-                  else openPlaceholder();
-                }
-              }}
-            >
-              <img src={it.icon} className={sidebarStyles.icon2} />
-              <div className={sidebarStyles.text2} style={{ flex: 1 }}>
-                <p className={isActive ? sidebarStyles.a4 : sidebarStyles.a5}>{it.label}</p>
-              </div>
-              {typeof it.badgeCount === 'number' && (
-                <span
-                  style={{
-                    marginRight: 12,
-                    minWidth: 22,
-                    height: 22,
-                    padding: '0 6px',
-                    borderRadius: 9999,
-                    background: '#fb2c36',
-                    color: '#fff',
-                    fontSize: 12,
-                    lineHeight: '22px',
-                    fontWeight: 700,
-                    textAlign: 'center',
-                  }}
-                >
-                  {it.badgeCount}
-                </span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
-        <div className={sidebarStyles.container4}>
-          <div className={sidebarStyles.primitiveSpan}>
-            <div className={sidebarStyles.text8}>
-              <p className={sidebarStyles.a6}>{initials}</p>
-            </div>
-          </div>
-          <div className={sidebarStyles.container3}>
-            <p className={sidebarStyles.a7}>{userName}</p>
-            <p className={sidebarStyles.a8}>{userRole}</p>
-          </div>
-        </div>
+    <>
+      {isMobile && (
         <button
-          onClick={() => {
-            dispatch(logout());
-            navigate('/auth');
-          }}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6,
-            background: 'transparent',
-            border: 'none',
-            color: '#9ca3af',
-            fontSize: 13,
-            fontWeight: 500,
-            cursor: 'pointer',
-            padding: '6px 12px',
-            borderRadius: 8,
-            transition: 'color 0.15s',
-            marginLeft: 16,
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = '#9ca3af')}
+          className={sidebarStyles.hamburger}
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Открыть меню"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
           </svg>
-          Выход
         </button>
+      )}
+
+      {isMobile && drawerOpen && (
+        <div className={sidebarStyles.backdrop} onClick={() => setDrawerOpen(false)} />
+      )}
+
+      <div className={sidebarClassName}>
+        <div className={sidebarStyles.container2}>
+          <div className={sidebarStyles.icon}>
+            <div className={sidebarStyles.autoWrapper}>
+              <div className={sidebarStyles.vector} />
+              <div className={sidebarStyles.vector2} />
+            </div>
+            <div className={sidebarStyles.autoWrapper2}>
+              <div className={sidebarStyles.vector3} />
+              <div className={sidebarStyles.vector4} />
+            </div>
+          </div>
+          <div className={sidebarStyles.container}>
+            <p className={sidebarStyles.a2}>ЕЦОПУ</p>
+            <div className={sidebarStyles.paragraph}>
+              <p className={sidebarStyles.a3}>{portalSubtitle}</p>
+            </div>
+          </div>
+          {isMobile && (
+            <button
+              className={sidebarStyles.drawerClose}
+              onClick={() => setDrawerOpen(false)}
+              aria-label="Закрыть меню"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        <div className={sidebarStyles.navigation}>
+          {items.map((it) => {
+            const isActive = Boolean(it.path) && location.pathname === it.path;
+            return (
+              <div
+                key={it.key}
+                className={isActive ? sidebarStyles.button : sidebarStyles.button2}
+                onClick={() => handleNav(it.path)}
+                tabIndex={0}
+                role="button"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    handleNav(it.path);
+                  }
+                }}
+              >
+                <img src={it.icon} className={sidebarStyles.icon2} />
+                <div className={sidebarStyles.text2} style={{ flex: 1 }}>
+                  <p className={isActive ? sidebarStyles.a4 : sidebarStyles.a5}>{it.label}</p>
+                </div>
+                {typeof it.badgeCount === 'number' && (
+                  <span
+                    style={{
+                      marginRight: 12,
+                      minWidth: 22,
+                      height: 22,
+                      padding: '0 6px',
+                      borderRadius: 9999,
+                      background: '#fb2c36',
+                      color: '#fff',
+                      fontSize: 12,
+                      lineHeight: '22px',
+                      fontWeight: 700,
+                      textAlign: 'center',
+                    }}
+                  >
+                    {it.badgeCount}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, width: '100%' }}>
+          <div className={sidebarStyles.container4}>
+            <div className={sidebarStyles.primitiveSpan}>
+              <div className={sidebarStyles.text8}>
+                <p className={sidebarStyles.a6}>{initials}</p>
+              </div>
+            </div>
+            <div className={sidebarStyles.container3}>
+              <p className={sidebarStyles.a7}>{userName}</p>
+              <p className={sidebarStyles.a8}>{userRole}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              dispatch(logout());
+              navigate('/auth');
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              background: 'transparent',
+              border: 'none',
+              color: '#9ca3af',
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: 'pointer',
+              padding: '6px 12px',
+              borderRadius: 8,
+              transition: 'color 0.15s',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = '#9ca3af')}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            Выход
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

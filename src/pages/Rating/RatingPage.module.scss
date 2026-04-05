@@ -1,6 +1,6 @@
 .page {
   display: flex;
-  width: 100vw;
+  width: 100%;
   min-height: 100vh;
   background: #f9fafb;
   color: #1B2559;
@@ -278,6 +278,32 @@
   transition: width 0.4s ease;
 }
 
+/* ── Sub-parameters ── */
+.subParams {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 10px;
+}
+
+.subParamRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.subParamName {
+  color: #A3AED0;
+}
+
+.subParamValue {
+  color: #1B2559;
+  font-weight: 600;
+}
+
 /* ── Chart container ── */
 .chartContainer {
   margin-top: 16px;
@@ -464,6 +490,14 @@
   background: #eff6ff;
 }
 
+.separatorRow {
+  text-align: center;
+  padding: 4px 0;
+  font-size: 14px;
+  color: #A3AED0;
+  letter-spacing: 4px;
+}
+
 /* ── States ── */
 .loading,
 .error {
@@ -507,7 +541,7 @@
     flex-direction: column;
   }
   .topbar {
-    padding: 12px 16px;
+    padding: 12px 16px 12px 56px;
   }
   .main {
     padding: 16px;

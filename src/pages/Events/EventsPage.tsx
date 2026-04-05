@@ -17,6 +17,7 @@ import { useAppSelector } from '../../app/hooks';
 import {
   useGetStudentEventsQuery,
   useGetTeacherEventsQuery,
+  useCreateEventMutation,
   useApplyToEventMutation,
   useCancelApplicationMutation,
   useGetMyApplicationsQuery,
@@ -24,6 +25,7 @@ import {
   useCreateTeamMutation,
   useJoinTeamMutation,
 } from '../../services/eventApi';
+import type { TeacherEventViewDto } from '../../services/eventApi';
 
 type EventTag = 'Хакатон' | 'Карьера' | 'Обучение';
 
@@ -113,6 +115,7 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [teacherSelectedId, setTeacherSelectedId] = useState<string | null>(null);
+  const [teacherSelectedDay, setTeacherSelectedDay] = useState<number | null>(() => new Date().getDate());
   const [teacherCreateOpen, setTeacherCreateOpen] = useState(false);
 
   const [teacherCreateType, setTeacherCreateType] = useState<TeacherEventType | ''>('');
@@ -124,23 +127,23 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
   const [teacherCreatePlace, setTeacherCreatePlace] = useState('Кабинет 401');
   const [teacherCreateParticipants, setTeacherCreateParticipants] = useState('');
   const [teacherCreateOnline, setTeacherCreateOnline] = useState(false);
+  const [teacherCreateError, setTeacherCreateError] = useState('');
 
-  const [teacherEvents, setTeacherEvents] = useState<TeacherEvent[]>([]);
+  const [createEvent, { isLoading: createEventLoading }] = useCreateEventMutation();
 
-  useEffect(() => {
-    if (apiEvents?.success && apiEvents.data.length > 0) {
-      setTeacherEvents(apiEvents.data.map((e) => ({
-        id: e.id,
-        type: e.type as TeacherEventType,
-        title: e.title,
-        subtitle: e.subtitle,
-        dateISO: e.dateISO,
-        time: e.time,
-        durationMin: e.durationMin,
-        place: e.place,
-        participantCount: e.participantCount,
-      })));
-    }
+  const teacherEvents: TeacherEvent[] = useMemo(() => {
+    if (!apiEvents?.success || !apiEvents.data) return [];
+    return apiEvents.data.map((e: TeacherEventViewDto) => ({
+      id: e.id,
+      type: e.type as TeacherEventType,
+      title: e.title,
+      subtitle: e.subtitle,
+      dateISO: e.dateISO,
+      time: e.time,
+      durationMin: e.durationMin,
+      place: e.place,
+      participantCount: e.participantCount,
+    }));
   }, [apiEvents]);
 
   const teacherSelected = useMemo(
@@ -155,33 +158,6 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
     return `${styles.teacherTypePill} ${styles.teacherTypeGreen}`;
   };
 
-  const teacherTypeTextClass = (t: TeacherEventType) => {
-    if (t === 'Консультация') return styles.teacherTextBlue;
-    if (t === 'Лекция') return styles.teacherTextOrange;
-    if (t === 'Семинар') return styles.teacherTextPurple;
-    return styles.teacherTextGreen;
-  };
-
-  const teacherWeekItems = useMemo(() => {
-    const now = new Date();
-    const to = new Date(now);
-    to.setDate(now.getDate() + 7);
-
-    const within = (e: TeacherEvent) => {
-      const [h, m] = e.time.split(':').map((n) => Number(n));
-      const dt = new Date(`${e.dateISO}T${e.time}:00`);
-      if (!Number.isFinite(h) || !Number.isFinite(m)) return false;
-      return dt >= now && dt <= to;
-    };
-
-    return teacherEvents
-      .filter(within)
-      .sort((a, b) => {
-        const da = new Date(`${a.dateISO}T${a.time}:00`).getTime();
-        const db = new Date(`${b.dateISO}T${b.time}:00`).getTime();
-        return da - db;
-      });
-  }, [teacherEvents]);
 
   const teacherMonthKey = useMemo(
     () => `${teacherViewDate.getFullYear()}-${String(teacherViewDate.getMonth() + 1).padStart(2, '0')}`,
@@ -207,6 +183,24 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
     });
     return map;
   }, [teacherMonthEvents]);
+
+  const teacherSelectedDayEvents = useMemo(() => {
+    if (teacherSelectedDay == null) return [];
+    return (teacherEventsByDay.get(teacherSelectedDay) || []).sort((a, b) => a.time.localeCompare(b.time));
+  }, [teacherEventsByDay, teacherSelectedDay]);
+
+  const teacherToday = useMemo(() => {
+    const now = new Date();
+    const y = teacherViewDate.getFullYear();
+    const m = teacherViewDate.getMonth();
+    if (now.getFullYear() === y && now.getMonth() === m) return now.getDate();
+    return null;
+  }, [teacherViewDate]);
+
+  const teacherSelectedDayLabel = useMemo(() => {
+    if (teacherSelectedDay == null) return '';
+    return `${teacherSelectedDay} ${monthNameGenitive(teacherViewDate.getMonth())}`;
+  }, [teacherSelectedDay, teacherViewDate]);
 
   const teacherCalendar = useMemo(() => {
     const y = teacherViewDate.getFullYear();
@@ -240,6 +234,7 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
 
   const teacherOpenCreate = () => {
     setTeacherCreateOpen(true);
+    setTeacherCreateError('');
     setTeacherCreateType('');
     setTeacherCreateTitle('');
     setTeacherCreateSubtitle('');
@@ -253,25 +248,34 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
     setTeacherCreateOnline(false);
   };
 
-  const teacherSubmitCreate = () => {
-    if (!teacherCreateType || !teacherCreateTitle.trim() || !teacherCreateDate || !teacherCreateTime) return;
-    const duration = Math.max(5, Number(teacherCreateDuration) || 60);
-    const id = `t-${Math.random().toString(16).slice(2)}`;
-    setTeacherEvents((prev) => [
-      ...prev,
-      {
-        id,
-        type: teacherCreateType,
+  const teacherSubmitCreate = async () => {
+    if (!teacherCreateType || !teacherCreateTitle.trim() || !teacherCreateDate || !teacherCreateTime || !userId) return;
+    setTeacherCreateError('');
+
+    const durationMin = Math.max(5, Number(teacherCreateDuration) || 60);
+    const startDate = `${teacherCreateDate}T${teacherCreateTime}:00+03:00`;
+    const [hh, mm] = teacherCreateTime.split(':').map(Number);
+    const endMinutes = hh * 60 + mm + durationMin;
+    const endH = String(Math.floor(endMinutes / 60) % 24).padStart(2, '0');
+    const endM = String(endMinutes % 60).padStart(2, '0');
+    const endDate = `${teacherCreateDate}T${endH}:${endM}:00+03:00`;
+
+    try {
+      await createEvent({
         title: teacherCreateTitle.trim(),
-        subtitle: teacherCreateSubtitle.trim() || '—',
-        dateISO: teacherCreateDate,
-        time: teacherCreateTime,
-        durationMin: duration,
-        place: teacherCreateOnline ? 'Онлайн (Zoom)' : teacherCreatePlace.trim() || '—',
-        participantCount: 0,
-      },
-    ]);
-    setTeacherCreateOpen(false);
+        description: teacherCreateSubtitle.trim() || undefined,
+        startDate,
+        endDate,
+        format: teacherCreateOnline ? 'ONLINE' : 'OFFLINE',
+        eventType: teacherCreateType,
+        createdBy: userId,
+        location: teacherCreateOnline ? 'Онлайн (Zoom)' : teacherCreatePlace.trim() || undefined,
+      }).unwrap();
+      setTeacherCreateOpen(false);
+    } catch (err: unknown) {
+      const msg = (err as { data?: { message?: string } })?.data?.message || 'Не удалось создать мероприятие';
+      setTeacherCreateError(msg);
+    }
   };
 
   const teacherDownloadIcs = (event: TeacherEvent) => {
@@ -382,23 +386,32 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                       return <div key={`e-${idx}`} className={`${styles.teacherDayCell} ${styles.teacherDayEmpty}`} />;
                     }
                     const dayEvents = teacherEventsByDay.get(c.day) || [];
-                    const first = dayEvents[0];
+                    const isToday = c.day === teacherToday;
+                    const isSelected = c.day === teacherSelectedDay;
+                    const cellClasses = [
+                      styles.teacherDayCell,
+                      dayEvents.length ? styles.teacherDayHasEvents : '',
+                      isToday ? styles.teacherDayToday : '',
+                      isSelected ? styles.teacherDaySelected : '',
+                    ].filter(Boolean).join(' ');
+
                     return (
                       <div
                         key={`d-${c.day}-${idx}`}
-                        className={`${styles.teacherDayCell} ${dayEvents.length ? styles.teacherDayHasEvents : ''}`}
-                        role={dayEvents.length ? 'button' : undefined}
-                        tabIndex={dayEvents.length ? 0 : -1}
-                        onClick={() => (first ? setTeacherSelectedId(first.id) : undefined)}
+                        className={cellClasses}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setTeacherSelectedDay(c.day)}
                         onKeyDown={(e) => {
-                          if ((e.key === 'Enter' || e.key === ' ') && first) setTeacherSelectedId(first.id);
+                          if (e.key === 'Enter' || e.key === ' ') setTeacherSelectedDay(c.day);
                         }}
                       >
-                        <div className={styles.teacherDayNum}>{c.day}</div>
-                        {first && (
-                          <div className={`${styles.teacherDayEvent} ${teacherTypeTextClass(first.type)}`}>
-                            {first.time} {first.title.slice(0, 10)}
-                            {first.title.length > 10 ? '…' : ''}
+                        <div className={`${styles.teacherDayNum} ${isToday ? styles.teacherDayNumToday : ''}`}>{c.day}</div>
+                        {dayEvents.length > 0 && (
+                          <div className={styles.teacherDayDots}>
+                            {dayEvents.slice(0, 3).map((ev, i) => (
+                              <span key={i} className={`${styles.teacherDot} ${styles[`teacherDot${ev.type === 'Консультация' ? 'Blue' : ev.type === 'Лекция' ? 'Orange' : ev.type === 'Семинар' ? 'Purple' : 'Green'}`]}`} />
+                            ))}
                           </div>
                         )}
                       </div>
@@ -408,10 +421,11 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
               </div>
 
               <div className={styles.teacherUpcomingCard}>
-                <div className={styles.teacherUpcomingTitle}>Ближайшие события</div>
-                <div className={styles.teacherUpcomingSub}>На этой неделе</div>
+                <div className={styles.teacherUpcomingTitle}>
+                  {teacherSelectedDay != null ? `Мероприятия на ${teacherSelectedDayLabel}` : 'Выберите дату'}
+                </div>
                 <div className={styles.teacherUpcomingList}>
-                  {teacherWeekItems.map((e) => (
+                  {teacherSelectedDayEvents.map((e) => (
                     <div
                       key={e.id}
                       className={styles.teacherUpcomingItem}
@@ -422,18 +436,18 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                         if (ev.key === 'Enter' || ev.key === ' ') setTeacherSelectedId(e.id);
                       }}
                     >
-                      <div className={styles.teacherUpcomingTime}>
-                        <div className={styles.teacherUpcomingDay}>{Number(e.dateISO.slice(8, 10))}</div>
-                        <div className={styles.teacherUpcomingClock}>{e.time}</div>
-                      </div>
+                      <div className={styles.teacherUpcomingStripe} style={{ backgroundColor: e.type === 'Консультация' ? '#2563eb' : e.type === 'Лекция' ? '#d97706' : e.type === 'Семинар' ? '#7e22ce' : '#16a34a' }} />
                       <div className={styles.teacherUpcomingBody}>
-                        <div className={teacherTypePillClass(e.type)}>{e.type}</div>
+                        <div className={styles.teacherUpcomingClock}>{e.time}</div>
                         <div className={styles.teacherUpcomingName}>{e.title}</div>
                         <div className={styles.teacherUpcomingPlace}>{e.place}</div>
+                        <div className={teacherTypePillClass(e.type)}>{e.type}</div>
                       </div>
                     </div>
                   ))}
-                  {!teacherWeekItems.length && <div className={styles.teacherUpcomingEmpty}>Нет событий на этой неделе</div>}
+                  {teacherSelectedDay != null && !teacherSelectedDayEvents.length && (
+                    <div className={styles.teacherUpcomingEmpty}>Нет мероприятий на эту дату</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -603,6 +617,8 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
               </label>
             </div>
 
+            {teacherCreateError && <div className={styles.teacherCreateError}>{teacherCreateError}</div>}
+
             <div className={styles.teacherCreateActions}>
               <button type="button" className={styles.teacherCancelBtn} onClick={teacherCloseCreate}>
                 Отмена
@@ -611,9 +627,9 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                 type="button"
                 className={styles.teacherSubmitBtn}
                 onClick={teacherSubmitCreate}
-                disabled={!teacherCreateType || !teacherCreateTitle.trim() || !teacherCreateDate || !teacherCreateTime}
+                disabled={!teacherCreateType || !teacherCreateTitle.trim() || !teacherCreateDate || !teacherCreateTime || createEventLoading}
               >
-                Создать мероприятие
+                {createEventLoading ? 'Создание...' : 'Создать мероприятие'}
               </button>
             </div>
           </div>

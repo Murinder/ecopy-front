@@ -1,13 +1,8 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { RootState } from '../app/store';
+import type { ApiResponse } from './types';
 
-export interface ApiResponse<T> {
-  success: boolean;
-  code?: string;
-  message?: string;
-  data: T;
-  timestamp?: string;
-}
+export type { ApiResponse };
 
 export interface TokenDto {
   accessToken: string;
@@ -91,6 +86,29 @@ export interface HeadProfileDto {
   departmentTeacherCount: number;
   departmentStudentCount: number;
   awards?: { id: string; title: string; year: string }[];
+}
+
+export interface TeacherProfileDto {
+  profile: UserProfileDto;
+  publications: number;
+  monographs: number;
+  articles: number;
+  conferences: number;
+  grants: number;
+  hours: number;
+  consultations: number;
+  teachingStartYear?: number;
+  supervisedPhd: number;
+  supervisedMasters: number;
+  supervisedBachelors: number;
+  awards?: { id: string; title: string; year: string }[];
+}
+
+export interface UserAwardDto {
+  id: string;
+  userId: string;
+  title: string;
+  year: string;
 }
 
 export interface FacultyDto {
@@ -305,7 +323,7 @@ export const coreApi = createApi({
       return headers;
     },
   }),
-  tagTypes: ['Applications', 'Profile', 'Teachers', 'Students', 'UserLinks', 'UserSkills', 'UserLanguages', 'Notifications', 'UserDocuments'],
+  tagTypes: ['Applications', 'Profile', 'Teachers', 'Students', 'UserLinks', 'UserSkills', 'UserLanguages', 'Notifications', 'UserDocuments', 'UserAwards'],
   endpoints: (builder) => ({
     login: builder.mutation<ApiResponse<TokenDto>, LoginRequest>({
       query: (body) => ({
@@ -344,6 +362,25 @@ export const coreApi = createApi({
     getHeadProfileDetails: builder.query<ApiResponse<HeadProfileDto>, string>({
       query: (userId) => `/api/v1/auth/profile/${userId}/head-details`,
       providesTags: ['Profile'],
+    }),
+    getTeacherProfileDetails: builder.query<ApiResponse<TeacherProfileDto>, string>({
+      query: (userId) => `/api/v1/auth/profile/${userId}/teacher-details`,
+      providesTags: ['Profile'],
+    }),
+    getUserAwards: builder.query<ApiResponse<UserAwardDto[]>, string>({
+      query: (userId) => `/api/v1/user-awards/user/${userId}`,
+      providesTags: ['UserAwards'],
+    }),
+    createUserAward: builder.mutation<ApiResponse<UserAwardDto>, { userId: string; title: string; year: string }>({
+      query: (body) => ({ url: '/api/v1/user-awards', method: 'POST', body }),
+      invalidatesTags: ['UserAwards'],
+    }),
+    deleteUserAward: builder.mutation<ApiResponse<void>, string>({
+      query: (awardId) => ({
+        url: `/api/v1/user-awards/${awardId}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['UserAwards'],
     }),
     getFaculty: builder.query<FacultyDto, string>({
       query: (facultyId) => `/api/v1/faculties/${facultyId}`,
@@ -507,6 +544,10 @@ export const {
   useRegisterMutation,
   useGetProfileQuery,
   useGetHeadProfileDetailsQuery,
+  useGetTeacherProfileDetailsQuery,
+  useGetUserAwardsQuery,
+  useCreateUserAwardMutation,
+  useDeleteUserAwardMutation,
   useLazyGetProfileQuery,
   useUpdateProfileMutation,
   useGetTeachersQuery,

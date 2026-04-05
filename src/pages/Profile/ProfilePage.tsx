@@ -32,6 +32,7 @@ import {
   useGetFacultyQuery,
   useGetDepartmentQuery,
   useGetHeadProfileDetailsQuery,
+  useGetTeacherProfileDetailsQuery,
 } from '../../services/coreApi';
 import { useGetRatingBreakdownQuery } from '../../services/ratingApi';
 import {
@@ -107,9 +108,10 @@ type TeacherProfile = {
   faculty: string;
   department: string;
   education: TeacherEducationItem[];
-  disciplines: string[];
+  skills: string[];
+  languages: string[];
   interests: string[];
-  stats: { publications: number; conferences: number; patents: number };
+  stats: { publications: number; conferences: number; grants: number };
   awards: TeacherAwardItem[];
   website: string;
   linkedin: string;
@@ -1325,14 +1327,54 @@ const TeacherProfileView = ({ userName, userId }: { userName: string; userId: st
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { data: profileData } = useGetProfileQuery(userId, { skip: !userId });
+  const [newSkillName, setNewSkillName] = useState('');
+  const [newSkillLevel, setNewSkillLevel] = useState(1);
+  const [showSkillForm, setShowSkillForm] = useState(false);
+  const [pendingSkillLevels, setPendingSkillLevels] = useState<Record<string, number>>({});
+  const [newLangName, setNewLangName] = useState('');
+  const [newLangProficiency, setNewLangProficiency] = useState('INTERMEDIATE');
+  const [showLangForm, setShowLangForm] = useState(false);
+  const [pendingLangProficiencies, setPendingLangProficiencies] = useState<Record<string, string>>({});
+  const { data: profileData, refetch: refetchProfile } = useGetProfileQuery(userId, { skip: !userId });
+  const { data: teacherDetails } = useGetTeacherProfileDetailsQuery(userId, { skip: !userId });
+  const { data: skillsData } = useGetUserSkillsQuery(userId, { skip: !userId });
+  const { data: languagesData } = useGetUserLanguagesQuery(userId, { skip: !userId });
+  const { data: linksData } = useGetUserLinksQuery(userId, { skip: !userId });
   const [updateProfileApi] = useUpdateProfileMutation();
+  const [createUserLink] = useCreateUserLinkMutation();
+  const [updateUserLink] = useUpdateUserLinkMutation();
+  const [deleteUserLink] = useDeleteUserLinkMutation();
+  const [createUserSkill] = useCreateUserSkillMutation();
+  const [deleteUserSkill] = useDeleteUserSkillMutation();
+  const [createUserLanguage] = useCreateUserLanguageMutation();
+  const [deleteUserLanguage] = useDeleteUserLanguageMutation();
 
   const apiName = profileData?.data
     ? [profileData.data.firstName, profileData.data.lastName].filter(Boolean).join(' ')
     : '';
 
   const pd = profileData?.data;
+  const td = teacherDetails?.data;
+
+  const existingLinks = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (linksData) {
+      for (const l of linksData) map[l.linkType] = l.url;
+    }
+    return map;
+  }, [linksData]);
+
+  const parsedEducation = useMemo<TeacherEducationItem[]>(() => {
+    if (!pd?.educationHistory) return [];
+    try {
+      const raw = JSON.parse(pd.educationHistory);
+      return (raw as { degree: string; university: string; program: string; year: string }[]).map(
+        (e, i) => ({ id: `e${i}`, degree: e.degree, university: e.university, program: e.program, year: e.year })
+      );
+    } catch {
+      return [];
+    }
+  }, [pd?.educationHistory]);
 
   const initial = useMemo<TeacherProfile>(
     () => ({
@@ -1349,35 +1391,20 @@ const TeacherProfileView = ({ userName, userId }: { userName: string; userId: st
       officeHours: pd?.officeHours || '',
       faculty: pd?.facultyName || '',
       department: pd?.departmentName || '',
-      // TODO: education, disciplines, interests, stats, awards need backend support
-      education: [
-        {
-          id: 'e1',
-          degree: 'Кандидат технических наук',
-          university: 'Московский государственный университет',
-          program: 'Системы автоматизации проектирования',
-          year: '2012',
-        },
-        {
-          id: 'e2',
-          degree: 'Магистр',
-          university: 'Московский государственный университет',
-          program: 'Программная инженерия',
-          year: '2008',
-        },
-      ],
-      disciplines: ['Алгоритмы и структуры данных', 'Веб-разработка', 'Программная инженерия', 'Проектирование информационных систем'],
-      interests: pd?.interests ? pd.interests.split(',').map((s: string) => s.trim()) : ['Искусственный интеллект', 'Машинное обучение', 'Веб-технологии', 'Облачные вычисления'],
-      stats: { publications: 24, conferences: 15, patents: 3 },
-      awards: [
-        { id: 'a1', title: 'Лучший преподаватель года', year: '2023' },
-        { id: 'a2', title: 'Грант РФФИ', year: '2022' },
-        { id: 'a3', title: 'Благодарность ректора', year: '2021' },
-      ],
-      website: pd?.website || '',
-      linkedin: pd?.linkedin || '',
+      education: parsedEducation,
+      skills: skillsData?.map(s => s.skillName) ?? [],
+      languages: languagesData?.map(l => l.language) ?? [],
+      interests: pd?.interests ? pd.interests.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
+      stats: {
+        publications: td?.publications ?? 0,
+        conferences: td?.conferences ?? 0,
+        grants: td?.grants ?? 0,
+      },
+      awards: td?.awards?.map((a) => ({ id: a.id, title: a.title, year: a.year })) ?? [],
+      website: existingLinks['WEBSITE'] || pd?.website || '',
+      linkedin: existingLinks['LINKEDIN'] || pd?.linkedin || '',
     }),
-    [userName, apiName, pd]
+    [userName, apiName, pd, td, parsedEducation, existingLinks, skillsData, languagesData]
   );
 
   const [profile, setProfile] = useState<TeacherProfile>(initial);
@@ -1411,12 +1438,54 @@ const TeacherProfileView = ({ userName, userId }: { userName: string; userId: st
         userId,
         data: {
           firstName: nameParts[0] || '',
-          lastName: nameParts[1] || '',
+          lastName: nameParts.slice(1).join(' ') || '',
           email: draft.email,
           phoneNumber: draft.phone,
+          bio: draft.about,
+          office: draft.office,
+          officeHours: draft.officeHours,
+          interests: draft.interests.join(', '),
+          website: draft.website,
+          linkedin: draft.linkedin,
         },
       }).unwrap();
-      setProfile(draft);
+
+      // Save links via UserLink API
+      const linkOps: Promise<unknown>[] = [];
+      const linkUpdates: { type: 'WEBSITE' | 'LINKEDIN'; url: string }[] = [
+        { type: 'WEBSITE', url: draft.website },
+        { type: 'LINKEDIN', url: draft.linkedin },
+      ];
+      for (const { type, url } of linkUpdates) {
+        const existing = existingLinks[type];
+        if (url && !existing) {
+          linkOps.push(createUserLink({ userId, linkType: type, url }).unwrap());
+        } else if (url && existing && url !== existing) {
+          linkOps.push(updateUserLink({ userId, linkType: type, url }).unwrap());
+        } else if (!url && existing) {
+          linkOps.push(deleteUserLink({ userId, linkType: type }).unwrap());
+        }
+      }
+
+      // Save skills
+      const addedSkills = draft.skills.filter(s => !profile.skills.includes(s));
+      const removedSkills = profile.skills.filter(s => !draft.skills.includes(s));
+      const skillOps = [
+        ...addedSkills.map(s => createUserSkill({ userId, skillName: s, level: pendingSkillLevels[s] || 1, verified: false }).unwrap()),
+        ...removedSkills.map(s => deleteUserSkill({ userId, skillName: s }).unwrap()),
+      ];
+
+      // Save languages
+      const addedLangs = draft.languages.filter(l => !profile.languages.includes(l));
+      const removedLangs = profile.languages.filter(l => !draft.languages.includes(l));
+      const langOps = [
+        ...addedLangs.map(l => createUserLanguage({ userId, language: l, proficiency: (pendingLangProficiencies[l] || 'INTERMEDIATE') as 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'FLUENT' | 'NATIVE' }).unwrap()),
+        ...removedLangs.map(l => deleteUserLanguage({ userId, language: l }).unwrap()),
+      ];
+
+      await Promise.all([...linkOps, ...skillOps, ...langOps]);
+
+      await refetchProfile();
       setIsEditing(false);
       setError(null);
     } catch {
@@ -1424,10 +1493,42 @@ const TeacherProfileView = ({ userName, userId }: { userName: string; userId: st
     }
   };
 
-  const addDiscipline = () => {
-    const name = window.prompt('Введите дисциплину');
-    if (!name) return;
-    setDraft((p) => ({ ...p, disciplines: [...p.disciplines, name.trim()].filter(Boolean) }));
+  const addSkill = () => {
+    const trimmed = newSkillName.trim();
+    if (!trimmed || draft.skills.includes(trimmed)) return;
+    setDraft((p) => ({ ...p, skills: [...p.skills, trimmed] }));
+    setPendingSkillLevels((prev) => ({ ...prev, [trimmed]: newSkillLevel }));
+    setNewSkillName('');
+    setNewSkillLevel(1);
+    setShowSkillForm(false);
+  };
+
+  const removeSkill = (name: string) => {
+    setDraft((p) => ({ ...p, skills: p.skills.filter(s => s !== name) }));
+    setPendingSkillLevels((prev) => {
+      const copy = { ...prev };
+      delete copy[name];
+      return copy;
+    });
+  };
+
+  const addLanguage = () => {
+    const trimmed = newLangName.trim();
+    if (!trimmed || draft.languages.includes(trimmed)) return;
+    setDraft((p) => ({ ...p, languages: [...p.languages, trimmed] }));
+    setPendingLangProficiencies((prev) => ({ ...prev, [trimmed]: newLangProficiency }));
+    setNewLangName('');
+    setNewLangProficiency('INTERMEDIATE');
+    setShowLangForm(false);
+  };
+
+  const removeLanguage = (name: string) => {
+    setDraft((p) => ({ ...p, languages: p.languages.filter(l => l !== name) }));
+    setPendingLangProficiencies((prev) => {
+      const copy = { ...prev };
+      delete copy[name];
+      return copy;
+    });
   };
 
   const addInterest = () => {
@@ -1577,18 +1678,110 @@ const TeacherProfileView = ({ userName, userId }: { userName: string; userId: st
               </div>
 
               <div className={styles.card}>
-                <div className={styles.cardTitle}>Преподаваемые дисциплины</div>
-                <div className={styles.teacherDisciplineGrid}>
-                  {(isEditing ? draft.disciplines : profile.disciplines).map((d) => (
-                    <div key={d} className={styles.teacherDisciplineTile}>
-                      <img src={CalendarIcon} className={styles.teacherDisciplineIcon} />
-                      <div className={styles.teacherDisciplineTitle}>{d}</div>
-                    </div>
-                  ))}
-                  {isEditing && (
-                    <button type="button" className={`${styles.teacherDisciplineTile} ${styles.teacherDisciplineAdd}`} onClick={addDiscipline}>
-                      + Добавить
-                    </button>
+                <div className={styles.cardTitle}>Навыки</div>
+                <div className={styles.chips}>
+                  {isEditing ? (
+                    <>
+                      {draft.skills.map((s) => (
+                        <span key={s} className={styles.chip} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          {s}
+                          {pendingSkillLevels[s] && (
+                            <span style={{ fontSize: 11, opacity: 0.6 }}>{SKILL_LEVEL_LABELS[pendingSkillLevels[s]]}</span>
+                          )}
+                          <span onClick={() => removeSkill(s)} role="button" tabIndex={0} style={{ marginLeft: 2, cursor: 'pointer', opacity: 0.6 }}>×</span>
+                        </span>
+                      ))}
+                      {showSkillForm ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <input
+                            value={newSkillName}
+                            onChange={(e) => setNewSkillName(e.target.value)}
+                            placeholder="Навык"
+                            style={{ width: 120, height: 28, borderRadius: 8, border: '1px solid #e5e5e5', padding: '0 8px', fontSize: 13 }}
+                            onKeyDown={(e) => { if (e.key === 'Enter') addSkill(); }}
+                          />
+                          <select
+                            value={newSkillLevel}
+                            onChange={(e) => setNewSkillLevel(Number(e.target.value))}
+                            style={{ height: 28, borderRadius: 8, border: '1px solid #e5e5e5', padding: '0 4px', fontSize: 13 }}
+                          >
+                            {[1, 2, 3, 4, 5].map((lv) => (
+                              <option key={lv} value={lv}>{SKILL_LEVEL_LABELS[lv]}</option>
+                            ))}
+                          </select>
+                          <button onClick={addSkill} disabled={!newSkillName.trim()} style={{ height: 28, borderRadius: 8, border: 'none', background: '#3a76f0', color: '#fff', padding: '0 10px', fontSize: 13, cursor: 'pointer' }}>OK</button>
+                          <button onClick={() => { setShowSkillForm(false); setNewSkillName(''); setNewSkillLevel(1); }} style={{ height: 28, borderRadius: 8, border: '1px solid #e5e5e5', background: '#fff', padding: '0 10px', fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                        </span>
+                      ) : (
+                        <span className={`${styles.chip} ${styles.addChip}`} onClick={() => setShowSkillForm(true)} role="button" tabIndex={0}>+ Добавить</span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {(skillsData ?? []).map((s) => (
+                        <span key={s.skillName} className={styles.chip} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          {s.skillName}
+                          <span style={{ fontSize: 11, opacity: 0.6 }}>{SKILL_LEVEL_LABELS[s.level] || `Lv${s.level}`}</span>
+                          {s.verified && <span style={{ color: '#16a34a', fontSize: 12 }} title="Подтверждено">✓</span>}
+                        </span>
+                      ))}
+                      {(skillsData ?? []).length === 0 && <span style={{ color: '#94a3b8', fontSize: 14 }}>—</span>}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className={styles.card}>
+                <div className={styles.cardTitle}>Языки</div>
+                <div className={styles.chips}>
+                  {isEditing ? (
+                    <>
+                      {draft.languages.map((l) => (
+                        <span key={l} className={styles.chip} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          {l}
+                          {pendingLangProficiencies[l] && (
+                            <span style={{ fontSize: 11, opacity: 0.6 }}>{LANG_PROFICIENCY_LABELS[pendingLangProficiencies[l]]}</span>
+                          )}
+                          <span onClick={() => removeLanguage(l)} role="button" tabIndex={0} style={{ marginLeft: 2, cursor: 'pointer', opacity: 0.6 }}>×</span>
+                        </span>
+                      ))}
+                      {showLangForm ? (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          <input
+                            value={newLangName}
+                            onChange={(e) => setNewLangName(e.target.value)}
+                            placeholder="Язык"
+                            style={{ width: 120, height: 28, borderRadius: 8, border: '1px solid #e5e5e5', padding: '0 8px', fontSize: 13 }}
+                            onKeyDown={(e) => { if (e.key === 'Enter') addLanguage(); }}
+                          />
+                          <select
+                            value={newLangProficiency}
+                            onChange={(e) => setNewLangProficiency(e.target.value)}
+                            style={{ height: 28, borderRadius: 8, border: '1px solid #e5e5e5', padding: '0 4px', fontSize: 13 }}
+                          >
+                            {Object.entries(LANG_PROFICIENCY_LABELS).map(([key, label]) => (
+                              <option key={key} value={key}>{label}</option>
+                            ))}
+                          </select>
+                          <button onClick={addLanguage} disabled={!newLangName.trim()} style={{ height: 28, borderRadius: 8, border: 'none', background: '#3a76f0', color: '#fff', padding: '0 10px', fontSize: 13, cursor: 'pointer' }}>OK</button>
+                          <button onClick={() => { setShowLangForm(false); setNewLangName(''); setNewLangProficiency('INTERMEDIATE'); }} style={{ height: 28, borderRadius: 8, border: '1px solid #e5e5e5', background: '#fff', padding: '0 10px', fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                        </span>
+                      ) : (
+                        <span className={`${styles.chip} ${styles.addChip}`} onClick={() => setShowLangForm(true)} role="button" tabIndex={0}>+ Добавить</span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {(languagesData ?? []).map((l) => (
+                        <span key={l.language} className={styles.chip}>
+                          {l.language}
+                          <span style={{ fontSize: 11, opacity: 0.6, marginLeft: 4 }}>
+                            {LANG_PROFICIENCY_LABELS[l.proficiency] || l.proficiency}
+                          </span>
+                        </span>
+                      ))}
+                      {(languagesData ?? []).length === 0 && <span style={{ color: '#94a3b8', fontSize: 14 }}>—</span>}
+                    </>
                   )}
                 </div>
               </div>
@@ -1623,8 +1816,8 @@ const TeacherProfileView = ({ userName, userId }: { userName: string; userId: st
                     <div className={styles.teacherStatLabel}>Конференций</div>
                   </div>
                   <div className={`${styles.teacherStatTile} ${styles.teacherStatPurple}`}>
-                    <div className={styles.teacherStatValue}>{profile.stats.patents}</div>
-                    <div className={styles.teacherStatLabel}>Патентов</div>
+                    <div className={styles.teacherStatValue}>{profile.stats.grants}</div>
+                    <div className={styles.teacherStatLabel}>Грантов</div>
                   </div>
                 </div>
               </div>

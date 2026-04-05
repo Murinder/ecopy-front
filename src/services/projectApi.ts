@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { RootState } from '../app/store';
+import type { ApiResponse } from './types';
 
 export interface ProjectDto {
   id: string;
@@ -79,13 +80,6 @@ export interface DepartmentDashboardDto {
   projectsByMonth?: Record<string, number>;
 }
 
-export interface ApiResponse<T> {
-  success: boolean;
-  code?: string;
-  message?: string;
-  data: T;
-  timestamp?: string;
-}
 
 export const projectApi = createApi({
   reducerPath: 'projectApi',

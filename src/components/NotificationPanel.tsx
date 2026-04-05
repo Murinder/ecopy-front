@@ -20,7 +20,7 @@ const Panel = ({ notifications, onMarkRead, onClose }: {
 
   return (
     <div ref={ref} style={{
-      position: 'absolute', top: 44, right: 0, width: 360, maxHeight: 440,
+      position: 'absolute', top: 44, right: 0, width: 360, maxWidth: 'calc(100vw - 24px)', maxHeight: 440,
       background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,.15)',
       zIndex: 100, overflow: 'hidden', display: 'flex', flexDirection: 'column',
     }}>

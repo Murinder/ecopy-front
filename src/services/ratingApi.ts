@@ -1,13 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { RootState } from '../app/store';
-
-export interface ApiResponse<T> {
-  success: boolean;
-  code?: string;
-  message?: string;
-  data: T;
-  timestamp?: string;
-}
+import type { ApiResponse } from './types';
 
 export interface StudentRatingDto {
   userId: string;
@@ -27,9 +20,19 @@ export interface RatingBreakdownDto {
   updatedAt: string;
   academicScore: number;
   activityScore: number;
-  communicationScore: number;
+  achievementsScore: number;
+  leadershipScore: number;
+  projectsScore: number;
+  innovationScore: number;
   monthGrowth: number;
   rawScore: number;
+  subParameters: Record<string, SubParameterDto[]> | null;
+}
+
+export interface SubParameterDto {
+  name: string;
+  score: number;
+  count: number;
 }
 
 export interface RatingHistoryDto {
@@ -49,12 +52,15 @@ export interface RatingComparisonDto {
   userName: string | null;
   userAcademic: number;
   userActivity: number;
-  userCommunication: number;
+  userAchievements: number;
   userTotal: number;
   avgAcademic: number;
   avgActivity: number;
-  avgCommunication: number;
+  avgAchievements: number;
   avgTotal: number;
+  groupAvg: number;
+  departmentAvg: number;
+  facultyAvg: number;
 }
 
 export interface RatingAchievementDto {

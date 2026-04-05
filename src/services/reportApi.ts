@@ -1,13 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { RootState } from '../app/store';
-
-export interface ApiResponse<T> {
-  success: boolean;
-  code?: string;
-  message?: string;
-  data: T;
-  timestamp?: string;
-}
+import type { ApiResponse } from './types';
 
 export interface ReportDto {
   id: string;

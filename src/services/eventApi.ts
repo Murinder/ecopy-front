@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { RootState } from '../app/store';
+import type { ApiResponse } from './types';
 
 export interface EventViewDto {
   id: string;
@@ -28,6 +29,19 @@ export interface TeacherEventViewDto {
   durationMin: number;
   place: string;
   participantCount: number;
+  status?: string;
+}
+
+export interface CreateEventDto {
+  title: string;
+  description?: string;
+  startDate: string;
+  endDate: string;
+  format: 'ONLINE' | 'OFFLINE' | 'HYBRID';
+  eventType?: string;
+  createdBy: string;
+  location?: string;
+  maxParticipants?: number;
 }
 
 export interface EventApplicationDto {
@@ -73,13 +87,6 @@ export interface CreateTeamMemberDto {
   role?: string;
 }
 
-export interface ApiResponse<T> {
-  success: boolean;
-  code?: string;
-  message?: string;
-  data: T;
-  timestamp?: string;
-}
 
 export interface LessonDto {
   id: string;
@@ -156,6 +163,14 @@ export const eventApi = createApi({
         params: { userId },
       }),
       providesTags: ['Events'],
+    }),
+    createEvent: builder.mutation<ApiResponse<unknown>, CreateEventDto>({
+      query: (body) => ({
+        url: '/api/v1/events',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Events'],
     }),
     getLessons: builder.query<ApiResponse<LessonDto[]>, { userId: string; semester?: number }>({
       query: ({ userId, semester }) => ({
@@ -244,6 +259,7 @@ export const eventApi = createApi({
 export const {
   useGetStudentEventsQuery,
   useGetTeacherEventsQuery,
+  useCreateEventMutation,
   useGetLessonsQuery,
   useCreateLessonMutation,
   useDeleteLessonMutation,

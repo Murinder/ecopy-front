@@ -22,10 +22,10 @@ import {
 const CATEGORY_LABELS: Record<string, string> = {
   academic: 'Успеваемость',
   activity: 'Активность',
-  communication: 'Коммуникация',
+  achievements: 'Достижения',
 };
 
-const BAR_COLORS = ['#4318FF', '#868CFF'];
+const BAR_COLORS = ['#4318FF', '#6C5DD3', '#868CFF', '#A8C5FF'];
 
 const RatingPage = () => {
   const userId = useAppSelector((s) => s.auth.userId) || '';
@@ -33,10 +33,10 @@ const RatingPage = () => {
 
   const { data: myRatingResp, isLoading: ratingLoading, isError: ratingError } =
     useGetStudentRatingQuery(userId, { skip: !userId });
-  const { data: breakdownResp } = useGetRatingBreakdownQuery(userId, { skip: !userId });
-  const { data: comparisonResp } = useGetComparisonQuery(userId, { skip: !userId });
-  const { data: achievementsResp } = useGetAchievementsQuery(userId, { skip: !userId });
-  const { data: leaderboardResp } = useGetLeaderboardQuery(
+  const { data: breakdownResp, isError: breakdownError } = useGetRatingBreakdownQuery(userId, { skip: !userId });
+  const { data: comparisonResp, isError: comparisonError } = useGetComparisonQuery(userId, { skip: !userId });
+  const { data: achievementsResp, isError: achievementsError } = useGetAchievementsQuery(userId, { skip: !userId });
+  const { data: leaderboardResp, isError: leaderboardError } = useGetLeaderboardQuery(
     { userId, limit: 10 },
     { skip: !userId },
   );
@@ -57,14 +57,16 @@ const RatingPage = () => {
     if (!leaderboard?.topStudents || leaderboard.topStudents.length === 0) {
       return [];
     }
-    const top = leaderboard.topStudents.map((s, i) => ({
-      rank: i + 1,
-      name: s.userName ?? `Студент ${s.userId.slice(0, 4)}`,
-      score: Math.round(s.totalScore),
-      you: s.userId === userId,
-    }));
+    const top: Array<{ rank: number; name: string; score: number; you: boolean; separator?: boolean }> =
+      leaderboard.topStudents.map((s, i) => ({
+        rank: i + 1,
+        name: s.userName ?? `Студент ${s.userId.slice(0, 4)}`,
+        score: Math.round(s.totalScore),
+        you: s.userId === userId,
+      }));
     const meInTop = top.some((l) => l.you);
     if (!meInTop && myRank) {
+      top.push({ rank: 0, name: '...', score: 0, you: false, separator: true });
       top.push({
         rank: myRank,
         name: userName ? `${userName} (Вы)` : 'Вы',
@@ -81,7 +83,7 @@ const RatingPage = () => {
     : 'На проверке';
 
   const monthGrowthLabel = breakdown?.monthGrowth != null
-    ? `${breakdown.monthGrowth >= 0 ? '+' : ''}${Math.round(breakdown.monthGrowth)}`
+    ? `${breakdown.monthGrowth >= 0 ? '+' : ''}${Math.round(breakdown.monthGrowth)} баллов`
     : '—';
 
   const levelLabel = scoreRounded >= 90 ? 'Отлично'
@@ -94,15 +96,20 @@ const RatingPage = () => {
     return [
       { subject: 'Академичность', value: breakdown.academicScore },
       { subject: 'Активность', value: breakdown.activityScore },
-      { subject: 'Коммуникация', value: breakdown.communicationScore },
+      { subject: 'Достижения', value: breakdown.achievementsScore },
+      { subject: 'Лидерство', value: breakdown.leadershipScore ?? 0 },
+      { subject: 'Проекты', value: breakdown.projectsScore ?? 0 },
+      { subject: 'Инновации', value: breakdown.innovationScore ?? 0 },
     ];
   }, [breakdown]);
 
   const barData = useMemo(() => {
     if (!comparison) return [];
     return [
-      { name: 'Вы', value: Math.round(comparison.userTotal) },
-      { name: 'Среднее', value: Math.round(comparison.avgTotal) },
+      { name: 'Я', value: Math.round(comparison.userTotal) },
+      { name: 'Группа', value: Math.round(comparison.groupAvg ?? 0) },
+      { name: 'Кафедра', value: Math.round(comparison.departmentAvg ?? 0) },
+      { name: 'Факультет', value: Math.round(comparison.facultyAvg ?? 0) },
     ];
   }, [comparison]);
 
@@ -110,7 +117,7 @@ const RatingPage = () => {
     const parts = name.trim().split(/\s+/).filter(Boolean);
     return parts.length >= 2
       ? (parts[0][0] + parts[1][0]).toUpperCase()
-      : (parts[0]?.[0] ?? '?').toUpperCase();
+      : (parts[0]?.[0] ?? 'И').toUpperCase();
   };
 
   const ringRadius = 52;
@@ -132,7 +139,7 @@ const RatingPage = () => {
               <NotificationBell iconSrc={BellIcon} />
             </div>
             <div className={styles.avatar}>
-              {userName.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || 'ИИ'}
+              {initialsFrom(userName)}
             </div>
           </div>
         </div>
@@ -197,65 +204,44 @@ const RatingPage = () => {
 
           {/* ── 3 Metric Cards ── */}
           <div className={styles.grid3}>
-            <div className={styles.card}>
-              <div className={styles.cardHead}>
-                <div className={`${styles.metricIcon} ${styles.metricIconBlue}`}>
-                  <img src={AwardIcon} alt="" width={20} height={20} />
+            {([
+              { key: 'academic', label: 'Успеваемость', hint: 'Средний балл по всем предметам', icon: AwardIcon, iconClass: styles.metricIconBlue, color: '#4318FF', score: breakdown?.academicScore },
+              { key: 'activity', label: 'Активность', hint: 'Участие в проектах и мероприятиях', icon: BoltIcon, iconClass: styles.metricIconOrange, color: '#FFB547', score: breakdown?.activityScore },
+              { key: 'achievements', label: 'Достижения', hint: 'Ваши достижения и портфолио', icon: ChatIcon, iconClass: styles.metricIconPurple, color: '#868CFF', score: breakdown?.achievementsScore },
+            ] as const).map((cat) => {
+              const subs = breakdown?.subParameters?.[cat.key] ?? [];
+              return (
+                <div key={cat.key} className={styles.card}>
+                  <div className={styles.cardHead}>
+                    <div className={`${styles.metricIcon} ${cat.iconClass}`}>
+                      <img src={cat.icon} alt="" width={20} height={20} />
+                    </div>
+                    <div className={styles.cardScoreLabel}>
+                      {cat.score != null ? `${Math.round(cat.score)} из 100` : '— из 100'}
+                    </div>
+                  </div>
+                  <div className={styles.metricTitle}>{cat.label}</div>
+                  <div className={styles.metricHint}>{cat.hint}</div>
+                  {cat.score != null ? (
+                    <div className={styles.metricBar}>
+                      <div className={styles.metricBarFill} style={{ width: `${Math.round(cat.score)}%`, background: cat.color }} />
+                    </div>
+                  ) : (
+                    <p className={styles.empty}>Нет данных</p>
+                  )}
+                  {subs.length > 0 && (
+                    <div className={styles.subParams}>
+                      {subs.map((s) => (
+                        <div key={s.name} className={styles.subParamRow}>
+                          <span className={styles.subParamName}>{s.name}</span>
+                          <span className={styles.subParamValue}>+{Math.round(s.score)} ({s.count})</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className={styles.cardScoreLabel}>
-                  {breakdown ? `${Math.round(breakdown.academicScore)} из 100` : '— из 100'}
-                </div>
-              </div>
-              <div className={styles.metricTitle}>Успеваемость</div>
-              <div className={styles.metricHint}>Средний балл по всем предметам</div>
-              {breakdown ? (
-                <div className={styles.metricBar}>
-                  <div className={styles.metricBarFill} style={{ width: `${Math.round(breakdown.academicScore)}%`, background: '#4318FF' }} />
-                </div>
-              ) : (
-                <p className={styles.empty}>Нет данных</p>
-              )}
-            </div>
-
-            <div className={styles.card}>
-              <div className={styles.cardHead}>
-                <div className={`${styles.metricIcon} ${styles.metricIconOrange}`}>
-                  <img src={BoltIcon} alt="" width={20} height={20} />
-                </div>
-                <div className={styles.cardScoreLabel}>
-                  {breakdown ? `${Math.round(breakdown.activityScore)} из 100` : '— из 100'}
-                </div>
-              </div>
-              <div className={styles.metricTitle}>Активность</div>
-              <div className={styles.metricHint}>Участие в проектах и мероприятиях</div>
-              {breakdown ? (
-                <div className={styles.metricBar}>
-                  <div className={styles.metricBarFill} style={{ width: `${Math.round(breakdown.activityScore)}%`, background: '#FFB547' }} />
-                </div>
-              ) : (
-                <p className={styles.empty}>Нет данных</p>
-              )}
-            </div>
-
-            <div className={styles.card}>
-              <div className={styles.cardHead}>
-                <div className={`${styles.metricIcon} ${styles.metricIconPurple}`}>
-                  <img src={ChatIcon} alt="" width={20} height={20} />
-                </div>
-                <div className={styles.cardScoreLabel}>
-                  {breakdown ? `${Math.round(breakdown.communicationScore)} из 100` : '— из 100'}
-                </div>
-              </div>
-              <div className={styles.metricTitle}>Коммуникация</div>
-              <div className={styles.metricHint}>Взаимодействие с командой и сообществом</div>
-              {breakdown ? (
-                <div className={styles.metricBar}>
-                  <div className={styles.metricBarFill} style={{ width: `${Math.round(breakdown.communicationScore)}%`, background: '#868CFF' }} />
-                </div>
-              ) : (
-                <p className={styles.empty}>Нет данных</p>
-              )}
-            </div>
+              );
+            })}
           </div>
 
           {/* ── Charts: Radar + Bar ── */}
@@ -263,7 +249,9 @@ const RatingPage = () => {
             <div className={styles.card}>
               <div className={styles.cardTitle}>Профиль навыков</div>
               <div className={styles.cardSub}>Ваши навыки и способности</div>
-              {radarData.length > 0 ? (
+              {breakdownError ? (
+                <p className={styles.error}>Ошибка загрузки данных</p>
+              ) : radarData.length > 0 ? (
                 <div className={styles.chartContainer}>
                   <ResponsiveContainer width="100%" height="100%">
                     <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="70%">
@@ -282,7 +270,9 @@ const RatingPage = () => {
             <div className={styles.card}>
               <div className={styles.cardTitle}>Сравнение с другими</div>
               <div className={styles.cardSub}>Ваши результаты относительно других студентов</div>
-              {barData.length > 0 ? (
+              {comparisonError ? (
+                <p className={styles.error}>Ошибка загрузки данных</p>
+              ) : barData.length > 0 ? (
                 <div className={styles.chartContainer}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={barData} barSize={56}>
@@ -305,8 +295,10 @@ const RatingPage = () => {
                 <p className={styles.empty}>Нет данных</p>
               )}
               <div className={styles.legendRow}>
-                <div className={styles.legendItem}><div className={styles.dot} style={{ background: '#4318FF' }} /> Вы</div>
-                <div className={styles.legendItem}><div className={styles.dot} style={{ background: '#868CFF' }} /> Среднее</div>
+                <div className={styles.legendItem}><div className={styles.dot} style={{ background: '#4318FF' }} /> Я</div>
+                <div className={styles.legendItem}><div className={styles.dot} style={{ background: '#6C5DD3' }} /> Группа</div>
+                <div className={styles.legendItem}><div className={styles.dot} style={{ background: '#868CFF' }} /> Кафедра</div>
+                <div className={styles.legendItem}><div className={styles.dot} style={{ background: '#A8C5FF' }} /> Факультет</div>
               </div>
             </div>
           </div>
@@ -315,13 +307,15 @@ const RatingPage = () => {
           <div className={styles.card}>
             <div className={styles.cardTitle}>Достижения</div>
             <div className={styles.cardSub}>Ваши награды и успехи</div>
-            {achievements && achievements.length > 0 ? (
+            {achievementsError ? (
+              <p className={styles.error}>Ошибка загрузки достижений</p>
+            ) : achievements && achievements.length > 0 ? (
               <div className={styles.achGrid}>
                 {achievements.map((a) => (
                   <div key={a.id} className={`${styles.achCard} ${styles.achCardActive}`}>
                     <div className={styles.achIcon}>
                       <img
-                        src={a.category === 'activity' ? BoltIcon : a.category === 'communication' ? ChatIcon : AwardIcon}
+                        src={a.category === 'activity' ? BoltIcon : a.category === 'achievements' ? ChatIcon : AwardIcon}
                         alt=""
                         width={20}
                         height={20}
@@ -356,29 +350,34 @@ const RatingPage = () => {
                 </div>
                 <span>Рейтинг</span>
               </div>
-              {leaders.length === 0 && <p className={styles.empty}>Нет данных</p>}
-              {leaders.map((l) => (
-                <div
-                  key={`${l.rank}-${l.name}`}
-                  className={`${styles.leaderRow} ${l.you ? styles.youRow : ''}`}
-                >
-                  <div className={styles.leaderLeft}>
-                    <div
-                      className={`${styles.rank} ${
-                        l.rank === 1 ? styles.rank1
-                        : l.rank === 2 ? styles.rank2
-                        : l.rank === 3 ? styles.rank3
-                        : styles.rankDefault
-                      }`}
-                    >
-                      {l.rank}
+              {leaderboardError && <p className={styles.error}>Ошибка загрузки рейтинга</p>}
+              {!leaderboardError && leaders.length === 0 && <p className={styles.empty}>Нет данных</p>}
+              {leaders.map((l) =>
+                l.separator ? (
+                  <div key="separator" className={styles.separatorRow}>···</div>
+                ) : (
+                  <div
+                    key={`${l.rank}-${l.name}`}
+                    className={`${styles.leaderRow} ${l.you ? styles.youRow : ''}`}
+                  >
+                    <div className={styles.leaderLeft}>
+                      <div
+                        className={`${styles.rank} ${
+                          l.rank === 1 ? styles.rank1
+                          : l.rank === 2 ? styles.rank2
+                          : l.rank === 3 ? styles.rank3
+                          : styles.rankDefault
+                        }`}
+                      >
+                        {l.rank}
+                      </div>
+                      <div className={styles.leaderAvatar}>{initialsFrom(l.name)}</div>
+                      <div className={styles.leaderName}>{l.name}</div>
                     </div>
-                    <div className={styles.leaderAvatar}>{initialsFrom(l.name)}</div>
-                    <div className={styles.leaderName}>{l.name}</div>
+                    <div className={styles.leaderScore}>{l.score}</div>
                   </div>
-                  <div className={styles.leaderScore}>{l.score}</div>
-                </div>
-              ))}
+                ),
+              )}
             </div>
           </div>
         </div>
