@@ -216,9 +216,10 @@
   background: #f9fafb;
 }
 .a32 {
-  color: #fafafa;
+  color: #374151;
   font-size: 12px;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .container7 {
@@ -837,7 +838,8 @@
   justify-content: center;
   border-radius: 7px;
   padding: 1px 7px;
-  height: 22px;
+  min-height: 22px;
+  height: auto;
   width: auto;
 }
 .badge3 {

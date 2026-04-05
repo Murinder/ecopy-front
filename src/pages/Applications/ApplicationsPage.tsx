@@ -52,8 +52,8 @@ const statusPillClass = (s: string) => {
   if (s === 'APPROVED' || s === 'COMPLETED') return styles.pillStatusApproved;
   if (s === 'REJECTED') return styles.pillStatusRejected;
   if (s === 'REVISION') return styles.pillPurple;
-  if (s === 'ADMIN_REVIEW') return styles.pillBlue;
-  if (s === 'IN_PROGRESS') return styles.pillBlue;
+  if (s === 'ADMIN_REVIEW') return styles.pillStatusBlue;
+  if (s === 'IN_PROGRESS') return styles.pillStatusBlue;
   if (s === 'WITHDRAWN') return styles.pillLow;
   return styles.pillStatusPending;
 };
