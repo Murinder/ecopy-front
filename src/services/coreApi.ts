@@ -340,6 +340,9 @@ export const coreApi = createApi({
       return headers;
     },
   }),
+  refetchOnFocus: true,
+  refetchOnReconnect: true,
+  refetchOnMountOrArgChange: 30,
   tagTypes: ['Applications', 'Profile', 'Teachers', 'Students', 'UserLinks', 'UserSkills', 'UserLanguages', 'Notifications', 'UserDocuments', 'UserAwards'],
   endpoints: (builder) => ({
     login: builder.mutation<ApiResponse<TokenDto>, LoginRequest>({

@@ -490,6 +490,8 @@
   position: relative;
   width: 100%;
   max-width: 720px;
+  max-height: 90vh;
+  overflow-y: auto;
   border: 1px solid #E2E8F0;
   border-radius: 20px;
   background: #ffffff;
@@ -1073,6 +1075,8 @@
   position: relative;
   width: 100%;
   max-width: 860px;
+  max-height: 90vh;
+  overflow-y: auto;
   border-radius: 20px;
   background: #ffffff;
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.24);
@@ -1083,6 +1087,8 @@
   position: relative;
   width: 100%;
   max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
   border-radius: 20px;
   background: #ffffff;
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.24);
@@ -1514,4 +1520,69 @@
   border: 1px solid #fecaca;
   font-size: 14px;
   color: #991b1b;
+}
+
+.filterBar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.filterSelect {
+  padding: 6px 12px;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #1B2559;
+  background: #fff;
+  cursor: pointer;
+
+  &:focus {
+    outline: 2px solid #3B82F6;
+  }
+}
+
+.teamMemberRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid #E2E8F0;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.teamMemberRole {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+
+  &[data-role='leader'] {
+    background: #dbeafe;
+    color: #1d4ed8;
+  }
+
+  &[data-role='member'] {
+    background: #f1f5f9;
+    color: #64748b;
+  }
+}
+
+.kickBtn {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(238, 93, 80, 0.3);
+  background: transparent;
+  color: #EE5D50;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: rgba(238, 93, 80, 0.08);
+  }
 }

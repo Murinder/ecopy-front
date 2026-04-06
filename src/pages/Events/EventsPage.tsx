@@ -26,6 +26,7 @@ import {
   useGetEventTeamsQuery,
   useGetTeamJoinRequestsQuery,
   useTeamDecisionMutation,
+  useLeaveTeamMutation,
   useGetEventApplicationsQuery,
   useUpdateApplicationStatusMutation,
 } from '../../services/eventApi';
@@ -310,11 +311,12 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
     setTeacherEditError('');
     const durationMin = Math.max(5, Number(teacherEditDuration) || 60);
     const startDate = `${teacherEditDate}T${teacherEditTime}:00+03:00`;
-    const [hh, mm] = teacherEditTime.split(':').map(Number);
-    const endMinutes = hh * 60 + mm + durationMin;
-    const endH = String(Math.floor(endMinutes / 60) % 24).padStart(2, '0');
-    const endM = String(endMinutes % 60).padStart(2, '0');
-    const endDate = `${teacherEditDate}T${endH}:${endM}:00+03:00`;
+    const startDt = new Date(`${teacherEditDate}T${teacherEditTime}:00`);
+    const endDt = new Date(startDt.getTime() + durationMin * 60000);
+    const endDateStr = `${endDt.getFullYear()}-${String(endDt.getMonth() + 1).padStart(2, '0')}-${String(endDt.getDate()).padStart(2, '0')}`;
+    const endH = String(endDt.getHours()).padStart(2, '0');
+    const endM = String(endDt.getMinutes()).padStart(2, '0');
+    const endDate = `${endDateStr}T${endH}:${endM}:00+03:00`;
     try {
       await updateEvent({
         id: teacherSelected.id,
@@ -358,11 +360,12 @@ const TeacherEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
 
     const durationMin = Math.max(5, Number(teacherCreateDuration) || 60);
     const startDate = `${teacherCreateDate}T${teacherCreateTime}:00+03:00`;
-    const [hh, mm] = teacherCreateTime.split(':').map(Number);
-    const endMinutes = hh * 60 + mm + durationMin;
-    const endH = String(Math.floor(endMinutes / 60) % 24).padStart(2, '0');
-    const endM = String(endMinutes % 60).padStart(2, '0');
-    const endDate = `${teacherCreateDate}T${endH}:${endM}:00+03:00`;
+    const startDt = new Date(`${teacherCreateDate}T${teacherCreateTime}:00`);
+    const endDt = new Date(startDt.getTime() + durationMin * 60000);
+    const endDateStr = `${endDt.getFullYear()}-${String(endDt.getMonth() + 1).padStart(2, '0')}-${String(endDt.getDate()).padStart(2, '0')}`;
+    const endH = String(endDt.getHours()).padStart(2, '0');
+    const endM = String(endDt.getMinutes()).padStart(2, '0');
+    const endDate = `${endDateStr}T${endH}:${endM}:00+03:00`;
 
     try {
       await createEvent({
@@ -989,6 +992,9 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
   const [applyError, setApplyError] = useState<string | null>(null);
   const [createTeamName, setCreateTeamName] = useState('');
   const [teamDecision] = useTeamDecisionMutation();
+  const [leaveTeam] = useLeaveTeamMutation();
+  const [appStatusFilter, setAppStatusFilter] = useState<string>('ALL');
+  const [appTypeFilter, setAppTypeFilter] = useState<string>('ALL');
 
   // New state for redesigned modal
   const [applyParticipantRole, setApplyParticipantRole] = useState<'PARTICIPANT' | 'OBSERVER' | ''>('');
@@ -1011,6 +1017,11 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
   const teamsEventId = selectedId ?? '';
   const { data: eventTeamsData } = useGetEventTeamsQuery(teamsEventId, { skip: !teamsEventId });
   const eventTeams = useMemo(() => eventTeamsData ?? [], [eventTeamsData]);
+
+  const { data: applyTeamsData, isLoading: applyTeamsLoading } = useGetEventTeamsQuery(
+    applyModalEventId ?? '', { skip: !applyModalEventId, refetchOnMountOrArgChange: true }
+  );
+  const applyTeams = useMemo(() => applyTeamsData ?? [], [applyTeamsData]);
 
   const myTeam = useMemo(() => {
     return eventTeams.find((t) =>
@@ -1082,6 +1093,16 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
   const list = tab === 'upcoming' ? upcoming : past;
   const counts = { upcoming: upcoming.length, past: past.length, my: myApplications.length };
   const allEvents = useMemo(() => [...upcoming, ...past], [upcoming, past]);
+  const filteredApplications = useMemo(() => {
+    return myApplications.filter((app) => {
+      if (appStatusFilter !== 'ALL' && app.status !== appStatusFilter) return false;
+      if (appTypeFilter !== 'ALL') {
+        const event = allEvents.find((e) => e.id === app.eventId);
+        if (!event || event.tag !== appTypeFilter) return false;
+      }
+      return true;
+    });
+  }, [myApplications, appStatusFilter, appTypeFilter, allEvents]);
   const selected = useMemo(
     () => (selectedId ? allEvents.find((e) => e.id === selectedId) : undefined),
     [allEvents, selectedId]
@@ -1188,8 +1209,16 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
     }
   };
 
-  const handleCancelApplication = async (applicationId: string) => {
-    await cancelApplication(applicationId).catch(() => {});
+  const handleCancelApplication = async (applicationId: string, isApproved = false) => {
+    const msg = isApproved
+      ? 'Вы уверены, что хотите отменить участие?'
+      : 'Вы уверены, что хотите отменить заявку?';
+    if (!window.confirm(msg)) return;
+    try {
+      await cancelApplication(applicationId).unwrap();
+    } catch {
+      alert('Не удалось отменить. Попробуйте позже.');
+    }
   };
 
 
@@ -1299,9 +1328,28 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
             {studentEventsError && <p className={styles.error}>Ошибка загрузки данных</p>}
 
             {tab === 'my' ? (
+              <>
+              <div className={styles.filterBar}>
+                <select className={styles.filterSelect} value={appStatusFilter} onChange={(e) => setAppStatusFilter(e.target.value)}>
+                  <option value="ALL">Все статусы</option>
+                  <option value="SUBMITTED">Заявка отправлена</option>
+                  <option value="APPROVED">Одобрено</option>
+                  <option value="REJECTED">Отклонено</option>
+                  <option value="WAITLISTED">В листе ожидания</option>
+                  <option value="PENDING_TEAM_APPROVAL">Ожидает одобрения</option>
+                </select>
+                <select className={styles.filterSelect} value={appTypeFilter} onChange={(e) => setAppTypeFilter(e.target.value)}>
+                  <option value="ALL">Все типы</option>
+                  <option value="Хакатон">Хакатон</option>
+                  <option value="Конференция">Конференция</option>
+                  <option value="Акселератор">Акселератор</option>
+                  <option value="Карьера">Карьера</option>
+                  <option value="Обучение">Обучение</option>
+                </select>
+              </div>
               <div className={styles.grid}>
-                {myApplications.length === 0 && <p className={styles.empty}>У вас нет заявок</p>}
-                {myApplications.map((app) => {
+                {filteredApplications.length === 0 && <p className={styles.empty}>{myApplications.length === 0 ? 'У вас нет заявок' : 'Нет заявок по выбранным фильтрам'}</p>}
+                {filteredApplications.map((app) => {
                   const event = allEvents.find((e) => e.id === app.eventId);
                   const statusKey = app.status;
                   return (
@@ -1320,13 +1368,18 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                           {app.participantRole === 'TEAM_CREATOR' ? 'Создатель команды' : 'Участник команды'}
                         </div>
                       )}
-                      {(statusKey === 'SUBMITTED' || statusKey === 'PENDING_TEAM_APPROVAL') && (
+                      {app.teamName && (
+                        <div className={styles.cardDesc} style={{ marginTop: 4, color: '#3B82F6', fontWeight: 500 }}>
+                          Команда: {app.teamName}
+                        </div>
+                      )}
+                      {(statusKey === 'SUBMITTED' || statusKey === 'PENDING_TEAM_APPROVAL' || statusKey === 'APPROVED') && (
                         <div className={styles.modalActions} style={{ marginTop: 12 }}>
                           <button
                             className={`${styles.actionBtn} ${styles.dangerBtn}`}
-                            onClick={() => handleCancelApplication(app.id)}
+                            onClick={() => handleCancelApplication(app.id, statusKey === 'APPROVED')}
                           >
-                            Отменить заявку
+                            {statusKey === 'APPROVED' ? 'Отменить участие' : 'Отменить заявку'}
                           </button>
                         </div>
                       )}
@@ -1334,6 +1387,7 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                   );
                 })}
               </div>
+              </>
             ) : (
               <div className={styles.listPanelLayout}>
                 <div className={styles.eventList}>
@@ -1476,6 +1530,14 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                                   Отменить заявку
                                 </button>
                               )}
+                              {existingApp.status === 'APPROVED' && (
+                                <button
+                                  className={`${styles.actionBtn} ${styles.dangerBtn}`}
+                                  onClick={() => handleCancelApplication(existingApp.id, true)}
+                                >
+                                  Отменить участие
+                                </button>
+                              )}
                             </>
                           );
                         }
@@ -1514,15 +1576,43 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                         <div style={{ marginTop: 16 }}>
                           <div className={styles.sectionLabel}>Ваша команда</div>
                           <div style={{ padding: '8px 12px', background: '#f0f4ff', borderRadius: 8, marginBottom: 8 }}>
-                            <div style={{ fontWeight: 600, fontSize: 14 }}>
+                            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: myTeam.members && myTeam.members.length > 0 ? 8 : 0 }}>
                               {myTeam.name}
                               {isTeamLeader && <span style={{ marginLeft: 8, fontSize: 11, color: '#3B82F6' }}>(вы лидер)</span>}
                             </div>
-                            {myTeam.memberUserIds && myTeam.memberUserIds.length > 0 && (
+                            {myTeam.members && myTeam.members.length > 0 ? (
+                              <div>
+                                {myTeam.members.map((member) => (
+                                  <div key={member.userId} className={styles.teamMemberRow}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                      <span style={{ fontSize: 13 }}>{member.userName || member.userId.slice(0, 8) + '...'}</span>
+                                      <span className={styles.teamMemberRole} data-role={member.role}>
+                                        {member.role === 'leader' ? 'Лидер' : 'Участник'}
+                                      </span>
+                                    </div>
+                                    {isTeamLeader && member.userId !== userId && (
+                                      <button
+                                        className={styles.kickBtn}
+                                        onClick={async () => {
+                                          if (!window.confirm(`Исключить ${member.userName || 'участника'} из команды?`)) return;
+                                          try {
+                                            await leaveTeam({ teamId: myTeam.id, userId: member.userId }).unwrap();
+                                          } catch {
+                                            alert('Не удалось исключить участника');
+                                          }
+                                        }}
+                                      >
+                                        Исключить
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : myTeam.memberUserIds && myTeam.memberUserIds.length > 0 ? (
                               <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
                                 Участников: {myTeam.memberUserIds.length}
                               </div>
-                            )}
+                            ) : null}
                           </div>
                           {isTeamLeader && pendingJoinRequests.length > 0 && (
                             <div style={{ marginBottom: 8 }}>
@@ -1666,7 +1756,12 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                       style={{ marginBottom: 8 }}
                     />
                     <div style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid #E2E8F0', borderRadius: 8 }}>
-                      {eventTeams
+                      {applyTeamsLoading && (
+                        <div style={{ padding: '12px', fontSize: 13, color: '#64748B', textAlign: 'center' }}>
+                          Загрузка команд...
+                        </div>
+                      )}
+                      {!applyTeamsLoading && applyTeams
                         .filter((t) => t.name.toLowerCase().includes(teamSearchQuery.toLowerCase()))
                         .sort((a, b) => a.name.localeCompare(b.name))
                         .map((team) => (
@@ -1687,7 +1782,7 @@ const StudentEventsView = ({ avatarInitials }: { avatarInitials: string }) => {
                             </span>
                           </div>
                         ))}
-                      {eventTeams.filter((t) => t.name.toLowerCase().includes(teamSearchQuery.toLowerCase())).length === 0 && (
+                      {!applyTeamsLoading && applyTeams.filter((t) => t.name.toLowerCase().includes(teamSearchQuery.toLowerCase())).length === 0 && (
                         <div style={{ padding: '8px 12px', fontSize: 13, color: '#94a3b8' }}>Команд не найдено</div>
                       )}
                     </div>

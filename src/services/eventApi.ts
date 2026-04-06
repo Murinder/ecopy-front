@@ -73,6 +73,7 @@ export interface EventApplicationDto {
   presentationDescription?: string;
   teamId?: string;
   userName?: string;
+  teamName?: string;
 }
 
 export interface CreateEventApplicationDto {
@@ -87,6 +88,13 @@ export interface CreateEventApplicationDto {
   teamName?: string;
 }
 
+export interface TeamMemberDetailDto {
+  userId: string;
+  userName: string | null;
+  role: string;
+  joinedAt: string;
+}
+
 export interface TeamDto {
   id: string;
   eventId: string;
@@ -94,6 +102,7 @@ export interface TeamDto {
   createdBy: string;
   createdAt: string;
   memberUserIds?: string[];
+  members?: TeamMemberDetailDto[];
 }
 
 export interface CreateTeamDto {
@@ -176,6 +185,9 @@ export const eventApi = createApi({
       return headers;
     },
   }),
+  refetchOnFocus: true,
+  refetchOnReconnect: true,
+  refetchOnMountOrArgChange: 30,
   tagTypes: ['Events', 'Lessons', 'Defenses', 'Applications', 'Teams'],
   endpoints: (builder) => ({
     getStudentEvents: builder.query<ApiResponse<EventViewDto[]>, string | undefined>({
@@ -303,7 +315,7 @@ export const eventApi = createApi({
     }),
     leaveTeam: builder.mutation<void, { teamId: string; userId: string }>({
       query: ({ teamId, userId }) => ({ url: `/api/v1/team-members/${teamId}/${userId}`, method: 'DELETE' }),
-      invalidatesTags: ['Teams'],
+      invalidatesTags: ['Teams', 'Applications'],
     }),
 
     // Team join requests

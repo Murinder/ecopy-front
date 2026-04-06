@@ -102,6 +102,9 @@ export const projectApi = createApi({
       return headers;
     },
   }),
+  refetchOnFocus: true,
+  refetchOnReconnect: true,
+  refetchOnMountOrArgChange: 30,
   tagTypes: ['Projects', 'Tasks', 'Documents', 'Comments'],
   endpoints: (builder) => ({
     getUserProjects: builder.query<ApiResponse<ProjectDto[]>, string>({

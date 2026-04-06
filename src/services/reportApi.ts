@@ -32,6 +32,9 @@ export const reportApi = createApi({
       return headers;
     },
   }),
+  refetchOnFocus: true,
+  refetchOnReconnect: true,
+  refetchOnMountOrArgChange: 30,
   tagTypes: ['Reports'],
   endpoints: (builder) => ({
     getMyReports: builder.query<ApiResponse<ReportDto[]>, void>({

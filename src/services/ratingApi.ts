@@ -89,6 +89,9 @@ export const ratingApi = createApi({
       return headers;
     },
   }),
+  refetchOnFocus: true,
+  refetchOnReconnect: true,
+  refetchOnMountOrArgChange: 30,
   tagTypes: ['Ratings'],
   endpoints: (builder) => ({
     getStudentRating: builder.query<ApiResponse<StudentRatingDto>, string>({
