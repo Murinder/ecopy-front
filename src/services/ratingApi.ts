@@ -1,0 +1,141 @@
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import type { RootState } from '../app/store';
+import type { ApiResponse } from './types';
+
+export interface StudentRatingDto {
+  userId: string;
+  userName: string | null;
+  totalScore: number;
+  calculationDetails: string;
+  updatedAt: string;
+  semester: number;
+  verificationStatus: string;
+}
+
+export interface RatingBreakdownDto {
+  userId: string;
+  totalScore: number;
+  verificationStatus: string;
+  semester: number;
+  updatedAt: string;
+  academicScore: number;
+  activityScore: number;
+  achievementsScore: number;
+  leadershipScore: number;
+  projectsScore: number;
+  innovationScore: number;
+  monthGrowth: number;
+  rawScore: number;
+  subParameters: Record<string, SubParameterDto[]> | null;
+}
+
+export interface SubParameterDto {
+  name: string;
+  score: number;
+  count: number;
+}
+
+export interface RatingHistoryDto {
+  id: string;
+  userId: string;
+  departmentId: string | null;
+  score: number;
+  calculatedAt: string;
+  reason: string;
+  criteriaId: string | null;
+  relatedEntityId: string | null;
+  semester: number;
+}
+
+export interface RatingComparisonDto {
+  userId: string;
+  userName: string | null;
+  userAcademic: number;
+  userActivity: number;
+  userAchievements: number;
+  userTotal: number;
+  avgAcademic: number;
+  avgActivity: number;
+  avgAchievements: number;
+  avgTotal: number;
+  groupAvg: number;
+  departmentAvg: number;
+  facultyAvg: number;
+}
+
+export interface RatingAchievementDto {
+  id: string;
+  title: string;
+  description: string;
+  score: number;
+  category: string;
+  earnedAt: string | null;
+  relatedEntityId: string | null;
+}
+
+export interface LeaderboardDto {
+  topStudents: StudentRatingDto[];
+  userRank: number;
+  totalStudents: number;
+}
+
+export const ratingApi = createApi({
+  reducerPath: 'ratingApi',
+  baseQuery: fetchBaseQuery({
+    baseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080',
+    prepareHeaders: (headers, { getState }) => {
+      const token = (getState() as RootState).auth.token?.accessToken;
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+      return headers;
+    },
+  }),
+  refetchOnFocus: true,
+  refetchOnReconnect: true,
+  refetchOnMountOrArgChange: 30,
+  tagTypes: ['Ratings'],
+  endpoints: (builder) => ({
+    getStudentRating: builder.query<ApiResponse<StudentRatingDto>, string>({
+      query: (userId) => ({ url: `/api/v1/ratings/students/${userId}` }),
+      providesTags: ['Ratings'],
+    }),
+    getTopStudents: builder.query<ApiResponse<StudentRatingDto[]>, number | void>({
+      query: (limit) => ({
+        url: '/api/v1/ratings/students/top',
+        params: { limit: limit ?? 100 },
+      }),
+      providesTags: ['Ratings'],
+    }),
+    getRatingDetails: builder.query<ApiResponse<RatingHistoryDto[]>, string>({
+      query: (userId) => ({ url: `/api/v1/ratings/students/${userId}/details` }),
+    }),
+    getRatingBreakdown: builder.query<ApiResponse<RatingBreakdownDto>, string>({
+      query: (userId) => ({ url: `/api/v1/ratings/students/${userId}/breakdown` }),
+      providesTags: ['Ratings'],
+    }),
+    getComparison: builder.query<ApiResponse<RatingComparisonDto>, string>({
+      query: (userId) => ({ url: `/api/v1/ratings/students/${userId}/comparison` }),
+      providesTags: ['Ratings'],
+    }),
+    getAchievements: builder.query<ApiResponse<RatingAchievementDto[]>, string>({
+      query: (userId) => ({ url: `/api/v1/ratings/students/${userId}/achievements` }),
+      providesTags: ['Ratings'],
+    }),
+    getLeaderboard: builder.query<ApiResponse<LeaderboardDto>, { userId: string; limit?: number }>({
+      query: ({ userId, limit }) => ({
+        url: `/api/v1/ratings/students/${userId}/leaderboard`,
+        params: { limit: limit ?? 10 },
+      }),
+      providesTags: ['Ratings'],
+    }),
+  }),
+});
+
+export const {
+  useGetStudentRatingQuery,
+  useGetTopStudentsQuery,
+  useGetRatingDetailsQuery,
+  useGetRatingBreakdownQuery,
+  useGetComparisonQuery,
+  useGetAchievementsQuery,
+  useGetLeaderboardQuery,
+} = ratingApi;
