@@ -1,73 +1,97 @@
-# React + TypeScript + Vite
+# ЕЦОПУ — фронтенд
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Фронтенд Единой цифровой образовательной платформы университета (ЕЦОПУ). Платформа объединяет работу с учебными проектами, мероприятиями, рейтингами, отчётностью и цифровыми профилями студентов и преподавателей.
 
-Currently, two official plugins are available:
+## Возможности
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- регистрация, авторизация и восстановление доступа;
+- управление проектами и заявками на участие;
+- работа с мероприятиями и расписанием;
+- просмотр активности, рейтингов и отчётов;
+- личные кабинеты для студентов и преподавателей;
+- аналитические представления для заведующего кафедрой;
+- адаптивный интерфейс для настольных и мобильных устройств.
 
-## React Compiler
+## Технологический стек
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- React 19 и TypeScript;
+- Vite;
+- Redux Toolkit и RTK Query;
+- React Router;
+- Recharts;
+- SCSS Modules;
+- Docker и Nginx.
 
-## Expanding the ESLint configuration
+## Требования
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- Node.js `20.19+` или `22.12+`;
+- npm;
+- запущенный backend ЕЦОПУ, по умолчанию доступный по адресу `http://localhost:8080`.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Локальный запуск
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+Установите зависимости:
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm ci
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+При необходимости создайте файл `.env.local` и укажите адрес backend:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```env
+VITE_API_BASE_URL=http://localhost:8080
 ```
+
+Запустите сервер разработки:
+
+```bash
+npm run dev
+```
+
+После запуска приложение будет доступно по адресу, указанному Vite в терминале.
+
+## Сборка
+
+Создание production-сборки:
+
+```bash
+npm run build
+```
+
+Локальная проверка собранного приложения:
+
+```bash
+npm run preview
+```
+
+## Запуск в Docker
+
+Для сборки образа и запуска Nginx выполните:
+
+```bash
+docker compose up --build
+```
+
+Приложение будет доступно по адресу `http://localhost`. Переменную `VITE_API_BASE_URL` можно задать в файле `.env` рядом с `docker-compose.yml`.
+
+## Структура проекта
+
+```text
+src/
+├── app/          # Redux store и типизированные хуки
+├── components/   # общие компоненты интерфейса
+├── features/     # состояние функциональных модулей
+├── pages/        # страницы приложения
+├── routes/       # маршрутизация и защищённые маршруты
+├── services/     # API-клиенты RTK Query
+└── types/        # общие объявления типов
+
+docs/design/      # дизайн-система и описание экранов
+info/             # техническое задание и описания сервисов
+```
+
+## Документация
+
+- [Дизайн-система](docs/design/DESIGN_SYSTEM.md)
+- [Описание экранов и маршрутов](docs/design/SCREENS.md)
+- [Техническое задание](info/Техничкское%20задание.txt)
