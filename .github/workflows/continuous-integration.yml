@@ -1,0 +1,77 @@
+name: Continuous integration
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: continuous-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Test and build on local Windows runner
+    runs-on: [self-hosted, Windows, X64, ecopy-front, node24]
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+
+    steps:
+      - name: Show runner capabilities
+        run: |
+          Write-Host "Runner: $env:RUNNER_NAME"
+          Write-Host "OS: $env:RUNNER_OS"
+          Write-Host "Architecture: $env:RUNNER_ARCH"
+          Write-Host "PowerShell: $($PSVersionTable.PSVersion)"
+
+      - name: Check out repository
+        run: |
+          git init .
+          if (git remote | Select-String '^origin$') {
+            git remote set-url origin "https://github.com/$env:GITHUB_REPOSITORY.git"
+          } else {
+            git remote add origin "https://github.com/$env:GITHUB_REPOSITORY.git"
+          }
+
+          $fetched = $false
+          foreach ($attempt in 1..5) {
+            git fetch --depth 1 origin $env:GITHUB_SHA
+            if ($LASTEXITCODE -eq 0) {
+              $fetched = $true
+              break
+            }
+            Start-Sleep -Seconds 5
+          }
+
+          if (-not $fetched) {
+            throw 'Could not fetch the requested commit from GitHub.'
+          }
+          git checkout --force FETCH_HEAD
+
+      - name: Show Node.js tools
+        run: |
+          node --version
+          npm --version
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build application
+        run: npm run build
+
+      - name: Upload production build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ecopy-front-dist-${{ github.sha }}
+          path: dist
+          if-no-files-found: error
+          retention-days: 30
