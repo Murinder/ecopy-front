@@ -11,10 +11,12 @@ jobs:
     name: Build on local Windows runner
     runs-on: [self-hosted, Windows, X64, ecopy-front, node24]
     timeout-minutes: 15
+    defaults:
+      run:
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
 
     steps:
       - name: Show runner capabilities
-        shell: powershell
         run: |
           Write-Host "Runner: $env:RUNNER_NAME"
           Write-Host "OS: $env:RUNNER_OS"
@@ -22,7 +24,6 @@ jobs:
           Write-Host "PowerShell: $($PSVersionTable.PSVersion)"
 
       - name: Check out repository
-        shell: powershell
         run: |
           git init .
           if (git remote | Select-String '^origin$') {
@@ -47,15 +48,12 @@ jobs:
           git checkout --force FETCH_HEAD
 
       - name: Show Node.js tools
-        shell: powershell
         run: |
           node --version
           npm --version
 
       - name: Install dependencies
-        shell: powershell
         run: npm ci
 
       - name: Build application
-        shell: powershell
         run: npm run build
