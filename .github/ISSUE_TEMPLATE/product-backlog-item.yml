@@ -1,0 +1,60 @@
+name: Product Backlog Item
+description: Создать элемент бэклога продукта для планирования в GitHub Project
+title: "[PBI] "
+labels:
+  - enhancement
+projects:
+  - Murinder/2
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Заполните карточку так, чтобы её можно было оценить и взять в спринт.
+
+  - type: input
+    id: ticket_id
+    attributes:
+      label: Ticket ID
+      description: Идентификатор рабочего элемента в формате ECP-PBI-NNN.
+      placeholder: ECP-PBI-008
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Описание
+      description: Опишите пользовательскую потребность и ожидаемый результат.
+      placeholder: Как пользователь, я хочу ..., чтобы ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Критерии приёмки
+      description: Перечислите проверяемые условия готовности.
+      placeholder: |
+        - [ ] Условие 1
+        - [ ] Условие 2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: activity
+    attributes:
+      label: Активность
+      description: Основной вид работы по карточке.
+      options:
+        - Design
+        - Development
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: ready
+    attributes:
+      label: Готовность к планированию
+      options:
+        - label: Описание и критерии приёмки проверены.
+          required: true
