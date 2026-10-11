@@ -22,13 +22,29 @@ jobs:
           Write-Host "PowerShell: $($PSVersionTable.PSVersion)"
 
       - name: Check out repository
-        uses: actions/checkout@v4
+        shell: powershell
+        run: |
+          git init .
+          if (git remote | Select-String '^origin$') {
+            git remote set-url origin "https://github.com/$env:GITHUB_REPOSITORY.git"
+          } else {
+            git remote add origin "https://github.com/$env:GITHUB_REPOSITORY.git"
+          }
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
+          $fetched = $false
+          foreach ($attempt in 1..5) {
+            git fetch --depth 1 origin $env:GITHUB_SHA
+            if ($LASTEXITCODE -eq 0) {
+              $fetched = $true
+              break
+            }
+            Start-Sleep -Seconds 5
+          }
+
+          if (-not $fetched) {
+            throw 'Could not fetch the requested commit from GitHub.'
+          }
+          git checkout --force FETCH_HEAD
 
       - name: Show Node.js tools
         shell: powershell
