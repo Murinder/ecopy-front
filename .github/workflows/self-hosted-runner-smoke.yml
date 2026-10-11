@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Show runner capabilities
-        shell: pwsh
+        shell: powershell
         run: |
           Write-Host "Runner: $env:RUNNER_NAME"
           Write-Host "OS: $env:RUNNER_OS"
@@ -31,13 +31,15 @@ jobs:
           cache: npm
 
       - name: Show Node.js tools
-        shell: pwsh
+        shell: powershell
         run: |
           node --version
           npm --version
 
       - name: Install dependencies
+        shell: powershell
         run: npm ci
 
       - name: Build application
+        shell: powershell
         run: npm run build
